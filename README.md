@@ -37,6 +37,8 @@ python -m alevel.cli grade --scores '{"A":4,"B":4,"C":5,"D":4,"E":4}'
 | `index.html` | 浏览器版评估工具（单文件，自动评测 + 人工评分双模式） |
 | `alevel/` | Python 完整实现：规则引擎、自动指标、CLI、测试、Web 构建脚本 |
 | `alevel/web/` | Web 应用源码（模板 + 构建脚本 + JS 引擎） |
+| `docs/audit-standard.md` | **审核定义标准**：等级/维度/1–5 评分标尺/判定规则/流程/报告/防伪验证 |
+| `docs/operating-principles.md` | **运行原理**：系统架构、A–E 指标算法、评级引擎、双引擎一致性 |
 | `docs/feasibility-report.md` | 可行性报告：设计缺陷、逐维度可行性、成本、路线图 |
 
 ## 📐 评分体系（方案 3.2/3.3/3.4）
