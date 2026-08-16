@@ -663,6 +663,9 @@ function refreshAutoGrade() {
   const flags = currentFlags();
   renderGradeInto(document.getElementById("auto-result"), scores, flags, "2-10", { auto: true });
 }
+
+// 自动评测为默认页: 页面加载即开始初始化 Pyodide (幂等)
+initPyodide();
 </script>
 </body>
 </html>
