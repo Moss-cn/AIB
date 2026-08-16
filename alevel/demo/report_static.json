@@ -1,0 +1,189 @@
+{
+  "schema_version": "1.0",
+  "video": {
+    "path": "demo/static.mp4",
+    "width": 256,
+    "height": 256,
+    "fps": 10.0,
+    "nb_frames": 20,
+    "duration_s": 2.0,
+    "codec": "h264"
+  },
+  "scores": {
+    "A": {
+      "value": 3.6,
+      "source": "auto"
+    },
+    "B": {
+      "value": 5.0,
+      "source": "auto"
+    },
+    "E": {
+      "value": 5.0,
+      "source": "auto"
+    },
+    "C": {
+      "value": 5.0,
+      "source": "manual",
+      "manual_value": 5.0
+    },
+    "D": {
+      "value": 4.0,
+      "source": "manual",
+      "manual_value": 4.0
+    }
+  },
+  "manual_scores": {
+    "C": 5.0,
+    "D": 4.0
+  },
+  "grade": {
+    "level": "A6",
+    "public": "高清优秀",
+    "equiv": "≈3K",
+    "composite": 9.14,
+    "scale": "2-10",
+    "capped": false,
+    "capped_from": null,
+    "cap_reason": null,
+    "chosen_req": {
+      "met": true,
+      "missing": [],
+      "min_req": 7.0
+    },
+    "requirements": [
+      {
+        "level": "A1",
+        "met": true,
+        "missing": [],
+        "min_req": 2.0
+      },
+      {
+        "level": "A2",
+        "met": true,
+        "missing": [],
+        "min_req": 3.0
+      },
+      {
+        "level": "A3",
+        "met": true,
+        "missing": [],
+        "min_req": 4.0
+      },
+      {
+        "level": "A4",
+        "met": true,
+        "missing": [],
+        "min_req": 5.0
+      },
+      {
+        "level": "A5",
+        "met": true,
+        "missing": [],
+        "min_req": 6.0
+      },
+      {
+        "level": "A6",
+        "met": true,
+        "missing": [],
+        "min_req": 7.0
+      },
+      {
+        "level": "A7",
+        "met": false,
+        "missing": [
+          "A≥4 (实际 3.6)"
+        ],
+        "min_req": 8.0
+      },
+      {
+        "level": "A8",
+        "met": false,
+        "missing": [
+          "A≥4.5 (实际 3.6)",
+          "D≥4.5 (实际 4.0)",
+          "F≥4 (未测)"
+        ],
+        "min_req": 8.5
+      },
+      {
+        "level": "A9",
+        "met": false,
+        "missing": [
+          "A≥4.5 (实际 3.6)",
+          "D≥4.5 (实际 4.0)",
+          "F≥4.5 (未测)",
+          "G≥4 (未测)"
+        ],
+        "min_req": 9.0
+      },
+      {
+        "level": "A10",
+        "met": false,
+        "missing": [
+          "综合得分≥9.5 (实际 9.14)",
+          "A≥5 (实际 3.6)",
+          "D≥5 (实际 4.0)",
+          "F≥4.5 (未测)",
+          "G≥4.5 (未测)",
+          "H≥4.5 (未测)"
+        ],
+        "min_req": 9.5
+      }
+    ],
+    "veto": {
+      "c_severe": false,
+      "b_severe": false
+    }
+  },
+  "model_level": null,
+  "metric_details": [
+    {
+      "dim": "A",
+      "score": 3.6,
+      "confidence": "medium",
+      "metrics": {
+        "hf_ratio": 0.0,
+        "res_retention": 1.0
+      },
+      "note": "A 为「有效分辨率」: 高分辨率不等于高画质, 此得分衡量可保留的真实细节量"
+    },
+    {
+      "dim": "B",
+      "score": 5.0,
+      "confidence": "medium",
+      "metrics": {
+        "flicker": 0.0,
+        "flow_smoothness": 0.0
+      },
+      "note": "B 权重最高(0.30), 是 AI 视频最大痛点; 闪烁/抽帧会显著拉低等级"
+    },
+    {
+      "dim": "E",
+      "score": 5.0,
+      "confidence": "low",
+      "metrics": {
+        "blocking": 0.0,
+        "laplacian_mad": 0.0,
+        "laplacian_std": 0.0,
+        "mean_luminance": 0.501960813999176
+      },
+      "note": "E 为弱代理指标: 纹理质感高度主观, 强烈建议人工复核"
+    },
+    {
+      "dim": "C",
+      "score": 5.0,
+      "confidence": "manual",
+      "metrics": {},
+      "note": "人工评分"
+    },
+    {
+      "dim": "D",
+      "score": 4.0,
+      "confidence": "manual",
+      "metrics": {},
+      "note": "人工评分"
+    }
+  ],
+  "test_cases_used": []
+}

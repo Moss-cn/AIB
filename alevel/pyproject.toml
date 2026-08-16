@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alevel-video-quality"
+version = "0.1.0"
+description = "A-Level (A1-A10) 评估工具: AI 生成视频技术画质等级判定 (规则引擎 + 自动指标 + CLI)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["numpy>=2.0"]
+
+[project.scripts]
+alevel = "alevel.cli:main"
+
+[tool.setuptools]
+packages = ["alevel", "alevel.metrics"]

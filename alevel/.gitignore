@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+*.egg-info/
+
+# 演示产物
+alevel/demo/*.mp4
+alevel/demo/*.webm
+alevel/demo/report_*.json
+alevel/demo/report_*.md
+
+# macOS
+.DS_Store
+
+# Node (web 测试)
+node_modules/

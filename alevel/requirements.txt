@@ -1,0 +1,7 @@
+# 运行时依赖 (本机已验证 Python 3.14 / ffmpeg 8.1)
+numpy>=2.0
+# 可选: 重型探针需要时自行安装
+# opencv-python-headless   # 未来探针可用
+# mediapipe                # C 手部关键点
+# paddleocr                # C 文字乱码率
+# torch                    # RAFT / Depth Anything / ArcFace 探针

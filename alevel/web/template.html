@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A-Level 画质评估 · AI 生成视频等级认证工具</title>
+<meta name="description" content="基于《AI视频画质等级体系 A1–A10》的浏览器端评估工具：人工评分即时出级，上传视频可跑自动指标（Pyodide），无需安装任何软件。">
+<style>
+  :root{--bg:#0f1117;--panel:#171a23;--panel2:#1d2130;--line:#2a2f42;--txt:#e8eaf2;--dim:#9aa3b8;--accent:#6c7cff;--accent2:#3ddc97;--warn:#ffb454;--bad:#ff5d6c;--ok:#3ddc97}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;line-height:1.55;min-height:100vh}
+  .wrap{max-width:1060px;margin:0 auto;padding:24px 18px 60px}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 0 18px;border-bottom:1px solid var(--line);margin-bottom:22px}
+  .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;box-shadow:0 4px 18px rgba(108,124,255,.35)}
+  .brand h1{font-size:20px;letter-spacing:.5px}
+  .brand p{color:var(--dim);font-size:12.5px}
+  .gh{margin-left:auto;color:var(--dim);text-decoration:none;font-size:13px;border:1px solid var(--line);padding:6px 12px;border-radius:8px}
+  .gh:hover{color:var(--txt);border-color:var(--accent)}
+  .tabs{display:flex;gap:8px;margin-bottom:18px}
+  .tabs button{background:var(--panel);color:var(--dim);border:1px solid var(--line);padding:9px 18px;border-radius:10px;font-size:14px;cursor:pointer;transition:.15s}
+  .tabs button.active{background:var(--panel2);color:var(--txt);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  section.tab{display:none}
+  section.tab.active{display:block}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .card h3{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .card h3 .tag{font-size:11px;color:var(--dim);font-weight:400;border:1px solid var(--line);padding:2px 8px;border-radius:99px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:860px){.grid2{grid-template-columns:1fr}}
+  .dim{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px dashed var(--line)}
+  .dim:last-child{border-bottom:none}
+  .dim .head{display:flex;justify-content:space-between;align-items:baseline}
+  .dim .code{font-weight:700;color:var(--accent);font-size:14px;width:24px}
+  .dim .name{font-size:13.5px}
+  .dim .desc{color:var(--dim);font-size:12px}
+  .dim .val{font-weight:700;font-size:16px;color:var(--accent2)}
+  input[type=range]{width:100%;accent-color:var(--accent);height:6px;cursor:pointer}
+  .checks{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .checks label{font-size:13px;color:var(--dim);display:flex;gap:6px;align-items:center;cursor:pointer}
+  select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px}
+  .btn{background:linear-gradient(135deg,var(--accent),#4a58d8);color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer;transition:.15s}
+  .btn:hover{filter:brightness(1.1)}
+  .btn.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.sm{padding:5px 10px;font-size:12px;border-radius:8px}
+  .result{display:none}
+  .result.show{display:block}
+  .grade-hero{display:flex;align-items:center;gap:22px;flex-wrap:wrap;background:linear-gradient(135deg,#1a1f33,#101322);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:16px}
+  .grade-badge{width:92px;height:92px;border-radius:20px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:34px;box-shadow:0 6px 26px rgba(108,124,255,.4)}
+  .grade-badge small{font-size:11px;font-weight:600;letter-spacing:1px;opacity:.9}
+  .grade-info h2{font-size:22px}
+  .grade-info .meta{color:var(--dim);font-size:13.5px;margin-top:6px}
+  .grade-info .score{font-size:15px;margin-top:10px}
+  .grade-info .score b{color:var(--accent2)}
+  .veto{border:1px solid rgba(255,93,108,.5);background:rgba(255,93,108,.08);color:#ffb3ba;border-radius:10px;padding:10px 14px;font-size:13.5px;margin-bottom:16px}
+  .req table{width:100%;border-collapse:collapse;font-size:13px}
+  .req th,.req td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left}
+  .req th{color:var(--dim);font-weight:500}
+  .req .ok{color:var(--ok)} .req .no{color:var(--bad)}
+  .report textarea{width:100%;min-height:220px;background:#0c0e14;color:#c8d3e8;border:1px solid var(--line);border-radius:10px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;resize:vertical}
+  .report .bar{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  .status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);margin-bottom:12px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--warn);animation:blink 1.2s infinite}
+  .dot.ready{background:var(--ok);animation:none}
+  .dot.fail{background:var(--bad);animation:none}
+  @keyframes blink{50%{opacity:.25}}
+  .hint{color:var(--dim);font-size:12.5px;margin-top:8px}
+  .filebox{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--dim);cursor:pointer;transition:.15s}
+  .filebox:hover{border-color:var(--accent);color:var(--txt)}
+  .filebox.drag{border-color:var(--accent2);background:rgba(61,220,151,.06)}
+  video{width:100%;max-width:340px;border-radius:10px;border:1px solid var(--line);margin-top:10px;display:block}
+  .metric-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+  .metric-row .m{color:var(--dim);font-size:12px}
+  footer{margin-top:30px;color:var(--dim);font-size:12px;border-top:1px solid var(--line);padding-top:14px}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">A</div>
+    <div class="brand">
+      <h1>A-Level 画质评估</h1>
+      <p>AI 生成视频技术画质等级 · A1–A10 · 世界模拟可信度</p>
+    </div>
+    <a class="gh" id="gh-link" href="#" target="_blank" rel="noopener">GitHub ↗</a>
+  </header>
+
+  <div class="tabs">
+    <button id="tab-btn-manual" class="active">✍️ 人工评分</button>
+    <button id="tab-btn-auto">🎬 自动评估</button>
+  </div>
+
+  <!-- ============ 人工评分 ============ -->
+  <section id="tab-manual" class="tab active">
+    <div class="grid2">
+      <div class="card">
+        <h3>核心维度评分 <span class="tag">必测 · 决定 A1–A7</span></h3>
+        <div id="core-dims"></div>
+        <div class="checks" style="margin-top:12px">
+          <label><input type="checkbox" id="fl-c"> 一票否决：结构严重畸形（六指/面部崩坏/文字乱码）→ 上限 A2</label>
+          <label><input type="checkbox" id="fl-b"> 一票否决：持续大幅闪烁/身份漂移 → 上限 A3</label>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h3>进阶维度 <span class="tag">A8–A10 门槛</span></h3>
+          <div id="adv-dims"></div>
+          <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+            <span style="font-size:13px;color:var(--dim)">分制</span>
+            <select id="scale"><option value="2-10" selected>2–10（方案正文）</option><option value="1-5">1–5（附录 C）</option></select>
+          </div>
+        </div>
+        <div class="card result" id="manual-result"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 自动评估 ============ -->
+  <section id="tab-auto" class="tab">
+    <div class="grid2">
+      <div class="card">
+        <h3>1 · 引擎就绪状态</h3>
+        <div class="status"><span class="dot" id="py-dot"></span><span id="py-status">尚未初始化（切换到本标签后自动加载）…</span></div>
+        <h3>2 · 选择视频</h3>
+        <div class="filebox" id="filebox">
+          <div style="font-size:26px">🎞️</div>
+          <div>点击选择或拖拽 AI 生成视频（MP4/WebM）</div>
+          <div class="hint">浏览器本地解码，视频不会上传到任何服务器</div>
+        </div>
+        <input type="file" id="file" accept="video/*" style="display:none">
+        <div id="video-box"></div>
+        <div class="hint" id="extract-info"></div>
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn" id="btn-run" disabled>运行自动评估</button>
+          <span class="hint" id="run-status"></span>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h3>3 · 自动指标结果 <span class="tag">A / B / E</span></h3>
+          <div id="metric-results"><div class="hint">选择视频并运行后显示 FFT 高频能量、时间闪烁、光流光滑度、块效应等指标。</div></div>
+        </div>
+        <div class="card">
+          <h3>4 · 人工补充评分 <span class="tag">C / D 必评</span></h3>
+          <div id="auto-manual-dims"></div>
+        </div>
+        <div class="card result" id="auto-result"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    ⚠️ 自动指标当前为占位标定（见可行性报告 §3.3），正式评级需在真实语料上重新标定；高等级（A7+）建议人工复核。<br>
+    本工具忠实实现《AI视频画质等级体系 A1–A10》v1.0 草案的权重公式、等级阈值与一票否决规则，含 3 处已知方案缺陷（见可行性报告 §1）。
+  </footer>
+</div>
+
+<script>
+/*__JS_ENGINE__*/
+</script>
+<script>
+const PY_MODULES = /*__PY_MODULES__*/;
+</script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+"use strict";
+const ENG = (typeof ALEVEL_ENGINE !== "undefined") ? ALEVEL_ENGINE : null;
+
+/* ---------------- 通用: 维度滑块 ---------------- */
+function dimSlider(container, dim, opts) {
+  const info = ENG.DIM_INFO[dim];
+  const box = document.createElement("div");
+  box.className = "dim";
+  box.innerHTML = '<div class="head"><span><span class="code">' + dim + '</span> <span class="name">' + info.name + '</span></span>'
+    + '<span class="val" id="val-' + dim + '">' + (opts.value || 3) + '</span></div>'
+    + '<div class="desc">' + info.desc + '</div>'
+    + '<input type="range" min="1" max="5" step="0.5" value="' + (opts.value || 3) + '" data-dim="' + dim + '">';
+  container.appendChild(box);
+  const input = box.querySelector("input");
+  input.addEventListener("input", () => {
+    document.getElementById("val-" + dim).textContent = parseFloat(input.value).toFixed(1).replace(/\.0$/, "");
+    if (opts.onChange) opts.onChange();
+  });
+  return input;
+}
+
+/* ---------------- 人工评分 ---------------- */
+function currentManualScores() {
+  const scores = {};
+  ENG.CORE_DIMS.forEach(d => scores[d] = parseFloat(document.querySelector('#core-dims input[data-dim="' + d + '"]').value));
+  ENG.ADV_DIMS.forEach(d => {
+    const el = document.querySelector('#adv-dims input[data-dim="' + d + '"]');
+    scores[d] = el.disabled ? null : parseFloat(el.value);
+  });
+  return scores;
+}
+function currentFlags() {
+  return { c_severe: document.getElementById("fl-c").checked, b_severe: document.getElementById("fl-b").checked };
+}
+function renderGradeInto(container, scores, flags, scale, meta) {
+  container.classList.add("show");
+  const adv = {};
+  ENG.ADV_DIMS.forEach(d => { if (scores[d] != null) adv[d] = scores[d]; });
+  const g = ENG.assignGrade(scores, Object.keys(adv).length ? adv : null, flags, scale);
+  window.__lastGrade = g;
+  window.__lastScores = scores;
+  window.__lastFlags = flags;
+  window.__lastScale = scale;
+  window.__lastMeta = meta || {};
+  const veto = [];
+  if (g.veto.c_severe) veto.push("C 结构严重畸形 → 上限 A2");
+  if (g.veto.b_severe) veto.push("B 持续闪烁/身份漂移 → 上限 A3");
+  let html = '<div class="grade-hero">'
+    + '<div class="grade-badge"><small>A-LEVEL</small>' + g.level.replace("A", "") + '</div>'
+    + '<div class="grade-info"><h2>' + g.level + ' · ' + g.public + '</h2>'
+    + '<div class="meta">等效技术画质：' + g.equiv + (g.capped ? ' ｜ ⚠️ 因否决项从 ' + g.capped_from + ' 下调' : '') + '</div>'
+    + '<div class="score">综合得分 <b>' + g.composite.toFixed(2) + '</b> / 10（' + g.scale + ' 分制）</div></div></div>';
+  if (veto.length) html += '<div class="veto">🚫 一票否决：' + veto.join("；") + '</div>';
+  html += '<div class="card req"><h3>等级判定过程</h3><table><tr><th>等级</th><th>综合分要求</th><th>满足</th><th>缺失项</th></tr>';
+  g.requirements.forEach(r => {
+    html += '<tr><td>' + r.level + '</td><td>≥' + r.min_req + '</td>'
+      + '<td class="' + (r.met ? "ok" : "no") + '">' + (r.met ? "✅" : "❌") + '</td>'
+      + '<td>' + (r.missing.length ? r.missing.join("、") : "—") + '</td></tr>';
+  });
+  html += '</table></div>';
+  html += '<div class="card report"><h3>报告</h3><div class="bar">'
+    + '<button class="btn ghost sm" onclick="copyReport(0)">复制 JSON</button>'
+    + '<button class="btn ghost sm" onclick="copyReport(1)">复制 Markdown</button>'
+    + '<button class="btn ghost sm" onclick="downloadReport(0)">下载 JSON</button>'
+    + '<button class="btn ghost sm" onclick="downloadReport(1)">下载 MD</button></div>'
+    + '<textarea id="report-txt" readonly></textarea></div>';
+  container.innerHTML = html;
+  document.getElementById("report-txt").value = mdReport(buildReport());
+}
+function buildReport() {
+  const rep = {
+    schema_version: "1.0",
+    source: window.__lastMeta.auto ? "web-auto" : "web-manual",
+    scores: {},
+    grade: window.__lastGrade,
+  };
+  ENG.CORE_DIMS.concat(ENG.ADV_DIMS).forEach(d => {
+    const v = window.__lastScores[d];
+    if (v != null) rep.scores[d] = { value: v, source: (window.__lastMeta.auto && ["A", "B", "E"].includes(d)) ? "auto" : "manual" };
+  });
+  return rep;
+}
+function mdReport(rep) {
+  const g = rep.grade;
+  const NL = String.fromCharCode(10);
+  const L = [];
+  L.push("# A-Level 画质评估报告");
+  L.push("");
+  L.push("- **等级**: **" + g.level + "** " + g.public + " (等效 " + g.equiv + ")");
+  L.push("- **综合得分**: " + g.composite.toFixed(2) + " / 10 (分制 " + g.scale + ")");
+  if (g.cap_reason) L.push("- ⚠️ **一票否决**: " + g.cap_reason + " → 最高等级 " + g.level);
+  L.push("");
+  L.push("## 维度得分 (1-5)");
+  L.push("");
+  L.push("| 维度 | 名称 | 得分 | 来源 |");
+  L.push("|------|------|------|------|");
+  ENG.CORE_DIMS.concat(ENG.ADV_DIMS).forEach(d => {
+    if (rep.scores[d]) L.push("| " + d + " | " + ENG.DIM_INFO[d].name + " | " + rep.scores[d].value + " | " + rep.scores[d].source + " |");
+  });
+  L.push("");
+  L.push("## 等级判定过程");
+  L.push("");
+  L.push("| 等级 | 综合分要求 | 满足? | 缺失项 |");
+  L.push("|------|-----------|-------|--------|");
+  g.requirements.forEach(r => L.push("| " + r.level + " | ≥" + r.min_req + " | " + (r.met ? "✅" : "❌") + " | " + (r.missing.length ? r.missing.join("、") : "—") + " |"));
+  L.push("");
+  L.push("> 自动指标为初筛代理, 阈值需在真实语料上标定; 高等级 (A7+) 建议人工复核。");
+  return L.join(NL);
+}
+function copyReport(which) {
+  const rep = buildReport();
+  navigator.clipboard.writeText(which ? mdReport(rep) : JSON.stringify(rep, null, 2)).then(() => alert("已复制到剪贴板"));
+}
+function downloadReport(which) {
+  const rep = buildReport();
+  const blob = new Blob([which ? mdReport(rep) : JSON.stringify(rep, null, 2)], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "alevel-report." + (which ? "md" : "json");
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------------- Tab 切换 ---------------- */
+document.getElementById("tab-btn-manual").addEventListener("click", () => switchTab("manual"));
+document.getElementById("tab-btn-auto").addEventListener("click", () => switchTab("auto"));
+function switchTab(name) {
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("active", b.id === "tab-btn-" + name));
+  document.getElementById("tab-manual").classList.toggle("active", name === "manual");
+  document.getElementById("tab-auto").classList.toggle("active", name === "auto");
+  if (name === "auto") initPyodide();
+}
+
+/* ---------------- 人工评分初始化 ---------------- */
+(function initManual() {
+  ENG.CORE_DIMS.forEach(d => dimSlider(document.getElementById("core-dims"), d, { value: 4, onChange: refreshManual }));
+  ENG.ADV_DIMS.forEach(d => {
+    const input = dimSlider(document.getElementById("adv-dims"), d, { value: 4, onChange: refreshManual });
+    input.disabled = true;
+    const wrap = input.closest(".dim");
+    const lab = document.createElement("label");
+    lab.style.cssText = "font-size:12px;color:var(--dim);display:flex;gap:6px;align-items:center";
+    lab.innerHTML = '<input type="checkbox" data-adv="' + d + '"> 启用评分';
+    wrap.appendChild(lab);
+    lab.querySelector("input").addEventListener("change", e => {
+      input.disabled = !e.target.checked;
+      input.style.opacity = e.target.checked ? 1 : 0.35;
+      refreshManual();
+    });
+    input.style.opacity = 0.35;
+  });
+  ["fl-c", "fl-b"].forEach(id => document.getElementById(id).addEventListener("change", refreshManual));
+  document.getElementById("scale").addEventListener("change", refreshManual);
+  refreshManual();
+})();
+function refreshManual() {
+  const scores = currentManualScores();
+  const flags = currentFlags();
+  const scale = document.getElementById("scale").value;
+  const adv = {};
+  ENG.ADV_DIMS.forEach(d => { if (scores[d] != null) adv[d] = scores[d]; });
+  renderGradeInto(document.getElementById("manual-result"), scores, flags, scale, {});
+}
+
+/* ---------------- 自动评估: 视频帧提取 ---------------- */
+const extract = { frames: null, n: 0, w: 0, h: 0 };
+const fileInput = document.getElementById("file");
+const filebox = document.getElementById("filebox");
+filebox.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+["dragover", "dragleave", "drop"].forEach(ev => filebox.addEventListener(ev, e => {
+  e.preventDefault();
+  filebox.classList.toggle("drag", ev === "dragover" || ev === "drop");
+  if (ev === "drop" && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+}));
+
+async function handleFile(file) {
+  const url = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.src = url;
+  video.preload = "auto";
+  video.muted = true;
+  await new Promise((res, rej) => { video.onloadedmetadata = res; video.onerror = () => rej(new Error("视频解码失败")); });
+  document.getElementById("video-box").innerHTML = "";
+  const vv = video.cloneNode();
+  vv.controls = true;
+  document.getElementById("video-box").appendChild(vv);
+  const fps = 10, maxFrames = 60, scale = 128;
+  const dur = video.duration || 0;
+  if (!(dur > 0)) { document.getElementById("extract-info").textContent = "⚠️ 无法读取视频时长"; return; }
+  const nFrames = Math.max(2, Math.min(maxFrames, Math.floor(dur * fps)));
+  const w = scale, h = Math.max(2, Math.round(scale * video.videoHeight / Math.max(1, video.videoWidth)) & ~1);
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  const frames = new Float32Array(nFrames * w * h);
+  document.getElementById("extract-info").textContent = "抽取帧… 0/" + nFrames;
+  for (let i = 0; i < nFrames; i++) {
+    video.currentTime = Math.min(i / fps, Math.max(0, dur - 0.05));
+    await new Promise(res => { const t = setTimeout(res, 4000); video.onseeked = () => { clearTimeout(t); res(); }; });
+    ctx.drawImage(video, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h).data;
+    for (let p = 0; p < w * h; p++) frames[i * w * h + p] = img[p * 4] / 255;
+    document.getElementById("extract-info").textContent = "抽取帧… " + (i + 1) + "/" + nFrames;
+  }
+  URL.revokeObjectURL(url);
+  extract.frames = frames; extract.n = nFrames; extract.w = w; extract.h = h;
+  document.getElementById("extract-info").textContent = "✅ 已提取 " + nFrames + " 帧（" + w + "×" + h + "，本地处理，未上传）";
+  document.getElementById("btn-run").disabled = !(window.__pyReady && nFrames);
+}
+
+/* ---------------- Pyodide 初始化 ---------------- */
+let pyInitPromise = null;
+function initPyodide() {
+  if (pyInitPromise) return pyInitPromise;
+  const dot = document.getElementById("py-dot"), st = document.getElementById("py-status");
+  pyInitPromise = (async () => {
+    try {
+      st.textContent = "加载 Pyodide 运行时…";
+      const pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/" });
+      window.__pyodide = pyodide;
+      st.textContent = "加载 NumPy 与指标模块…";
+      await pyodide.loadPackage("numpy");
+      installPyModules(pyodide);
+      window.__pyReady = true;
+      dot.className = "dot ready";
+      st.textContent = "✅ 引擎就绪（Pyodide + NumPy + A/B/E 自动指标）";
+      if (extract.frames) document.getElementById("btn-run").disabled = false;
+      window.__pyReady = true;
+      return pyodide;
+    } catch (e) {
+      dot.className = "dot fail";
+      st.textContent = "❌ 引擎加载失败：" + e.message + "（请检查网络后刷新页面重试）";
+      throw e;
+    }
+  })();
+  return pyInitPromise;
+}
+function installPyModules(pyodide) {
+  pyodide.runPython(
+    "import sys, types\n" +
+    "def _install(srcs):\n" +
+    "    def mk(name, src):\n" +
+    "        m = types.ModuleType(name)\n" +
+    "        m.__dict__['__name__'] = name\n" +
+    "        s = src.replace('from .. import spec', 'import spec')\n" +
+    "        s = s.replace('from . import spec', 'import spec')\n" +
+    "        s = s.replace('from . import util', 'import util')\n" +
+    "        exec(compile(s, name, 'exec'), m.__dict__)\n" +
+    "        sys.modules[name] = m\n" +
+    "        return m\n" +
+    "    mk('spec', srcs['spec.py'])\n" +
+    "    mk('util', srcs['util.py'])\n" +
+    "    mk('engine', srcs['engine.py'])\n" +
+    "    mk('spatial', srcs['spatial.py'])\n" +
+    "    mk('temporal', srcs['temporal.py'])\n" +
+    "    mk('texture', srcs['texture.py'])\n" +
+    "    return True\n" +
+    "_install(" + JSON.stringify(PY_MODULES) + ")\n"
+  );
+  pyodide.runPython(
+    "import json, numpy as np\n" +
+    "def _buf(obj):\n" +
+    "    if hasattr(obj, 'to_py'): obj = obj.to_py()\n" +
+    "    if isinstance(obj, (bytes, bytearray)): return bytes(obj)\n" +
+    "    if isinstance(obj, memoryview): return obj.tobytes()\n" +
+    "    return bytes(obj)\n" +
+    "def run_metrics(frames, n, h, w, lite=True):\n" +
+    "    arr = np.frombuffer(_buf(frames), dtype=np.float32).reshape(n, h, w)\n" +
+    "    from spatial import evaluate as se\n" +
+    "    from temporal import evaluate as te\n" +
+    "    from texture import evaluate as xe\n" +
+    "    out = {'A': se(arr), 'B': te(arr, lite=lite), 'E': xe(arr)}\n" +
+    "    return json.dumps(out, ensure_ascii=False)\n"
+  );
+}
+document.getElementById("btn-run").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-run");
+  const st = document.getElementById("run-status");
+  btn.disabled = true;
+  st.innerHTML = '<span class="spinner"></span> 运行自动指标（FFT / 闪烁 / 光流 / 块效应）…';
+  try {
+    const py = window.__pyodide;
+    const res = await py.globals.get("run_metrics")(extract.frames, extract.n, extract.w, extract.h, true);
+    const metrics = JSON.parse(res);
+    window.__autoMetrics = metrics;
+    const box = document.getElementById("metric-results");
+    box.innerHTML = "";
+    ["A", "B", "E"].forEach(d => {
+      const m = metrics[d];
+      const row = document.createElement("div");
+      row.className = "metric-row";
+      row.innerHTML = '<span><b>' + d + '</b> ' + ENG.DIM_INFO[d].name + '：<b style="color:var(--accent2)">' + m.score.toFixed(2) + '</b> 分</span>'
+        + '<span class="m">' + JSON.stringify(m.metrics) + '</span>';
+      box.appendChild(row);
+    });
+    box.appendChild(Object.assign(document.createElement("div"), { className: "hint", textContent: "自动分仅供参考，C/D 由人工补充后进入评级。" }));
+    refreshAutoGrade();
+    st.textContent = "✅ 完成";
+  } catch (e) {
+    st.textContent = "❌ " + e.message;
+  } finally {
+    btn.disabled = !(window.__pyReady && extract.frames);
+  }
+});
+
+/* ---------------- 自动评估: 人工补充 + 评级 ---------------- */
+(function initAutoManual() {
+  ["C", "D"].forEach(d => dimSlider(document.getElementById("auto-manual-dims"), d, { value: 3, onChange: refreshAutoGrade }));
+  ENG.ADV_DIMS.forEach(d => {
+    const input = dimSlider(document.getElementById("auto-manual-dims"), d, { value: 4, onChange: refreshAutoGrade });
+    input.disabled = true;
+    const wrap = input.closest(".dim");
+    const lab = document.createElement("label");
+    lab.style.cssText = "font-size:12px;color:var(--dim);display:flex;gap:6px;align-items:center";
+    lab.innerHTML = '<input type="checkbox" data-adv2="' + d + '"> 启用评分';
+    wrap.appendChild(lab);
+    lab.querySelector("input").addEventListener("change", e => {
+      input.disabled = !e.target.checked;
+      input.style.opacity = e.target.checked ? 1 : 0.35;
+      refreshAutoGrade();
+    });
+    input.style.opacity = 0.35;
+  });
+})();
+function refreshAutoGrade() {
+  if (!window.__autoMetrics) return;
+  const scores = {};
+  ["A", "B", "E"].forEach(d => scores[d] = window.__autoMetrics[d].score);
+  ["C", "D"].forEach(d => scores[d] = parseFloat(document.querySelector('#auto-manual-dims input[data-dim="' + d + '"]').value));
+  const adv = {};
+  ENG.ADV_DIMS.forEach(d => {
+    const el = document.querySelector('#auto-manual-dims input[data-dim="' + d + '"]');
+    if (!el.disabled) adv[d] = parseFloat(el.value);
+  });
+  const flags = currentFlags();
+  renderGradeInto(document.getElementById("auto-result"), scores, flags, "2-10", { auto: true });
+}
+</script>
+</body>
+</html>

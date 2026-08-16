@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A-Level 画质评估 · AI 生成视频等级认证工具</title>
+<meta name="description" content="基于《AI视频画质等级体系 A1–A10》的浏览器端评估工具：人工评分即时出级，上传视频可跑自动指标（Pyodide），无需安装任何软件。">
+<style>
+  :root{--bg:#0f1117;--panel:#171a23;--panel2:#1d2130;--line:#2a2f42;--txt:#e8eaf2;--dim:#9aa3b8;--accent:#6c7cff;--accent2:#3ddc97;--warn:#ffb454;--bad:#ff5d6c;--ok:#3ddc97}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;line-height:1.55;min-height:100vh}
+  .wrap{max-width:1060px;margin:0 auto;padding:24px 18px 60px}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 0 18px;border-bottom:1px solid var(--line);margin-bottom:22px}
+  .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;box-shadow:0 4px 18px rgba(108,124,255,.35)}
+  .brand h1{font-size:20px;letter-spacing:.5px}
+  .brand p{color:var(--dim);font-size:12.5px}
+  .gh{margin-left:auto;color:var(--dim);text-decoration:none;font-size:13px;border:1px solid var(--line);padding:6px 12px;border-radius:8px}
+  .gh:hover{color:var(--txt);border-color:var(--accent)}
+  .tabs{display:flex;gap:8px;margin-bottom:18px}
+  .tabs button{background:var(--panel);color:var(--dim);border:1px solid var(--line);padding:9px 18px;border-radius:10px;font-size:14px;cursor:pointer;transition:.15s}
+  .tabs button.active{background:var(--panel2);color:var(--txt);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  section.tab{display:none}
+  section.tab.active{display:block}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .card h3{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .card h3 .tag{font-size:11px;color:var(--dim);font-weight:400;border:1px solid var(--line);padding:2px 8px;border-radius:99px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:860px){.grid2{grid-template-columns:1fr}}
+  .dim{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px dashed var(--line)}
+  .dim:last-child{border-bottom:none}
+  .dim .head{display:flex;justify-content:space-between;align-items:baseline}
+  .dim .code{font-weight:700;color:var(--accent);font-size:14px;width:24px}
+  .dim .name{font-size:13.5px}
+  .dim .desc{color:var(--dim);font-size:12px}
+  .dim .val{font-weight:700;font-size:16px;color:var(--accent2)}
+  input[type=range]{width:100%;accent-color:var(--accent);height:6px;cursor:pointer}
+  .checks{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .checks label{font-size:13px;color:var(--dim);display:flex;gap:6px;align-items:center;cursor:pointer}
+  select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px}
+  .btn{background:linear-gradient(135deg,var(--accent),#4a58d8);color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;cursor:pointer;transition:.15s}
+  .btn:hover{filter:brightness(1.1)}
+  .btn.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.sm{padding:5px 10px;font-size:12px;border-radius:8px}
+  .result{display:none}
+  .result.show{display:block}
+  .grade-hero{display:flex;align-items:center;gap:22px;flex-wrap:wrap;background:linear-gradient(135deg,#1a1f33,#101322);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:16px}
+  .grade-badge{width:92px;height:92px;border-radius:20px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:34px;box-shadow:0 6px 26px rgba(108,124,255,.4)}
+  .grade-badge small{font-size:11px;font-weight:600;letter-spacing:1px;opacity:.9}
+  .grade-info h2{font-size:22px}
+  .grade-info .meta{color:var(--dim);font-size:13.5px;margin-top:6px}
+  .grade-info .score{font-size:15px;margin-top:10px}
+  .grade-info .score b{color:var(--accent2)}
+  .veto{border:1px solid rgba(255,93,108,.5);background:rgba(255,93,108,.08);color:#ffb3ba;border-radius:10px;padding:10px 14px;font-size:13.5px;margin-bottom:16px}
+  .req table{width:100%;border-collapse:collapse;font-size:13px}
+  .req th,.req td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left}
+  .req th{color:var(--dim);font-weight:500}
+  .req .ok{color:var(--ok)} .req .no{color:var(--bad)}
+  .report textarea{width:100%;min-height:220px;background:#0c0e14;color:#c8d3e8;border:1px solid var(--line);border-radius:10px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;resize:vertical}
+  .report .bar{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  .status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);margin-bottom:12px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--warn);animation:blink 1.2s infinite}
+  .dot.ready{background:var(--ok);animation:none}
+  .dot.fail{background:var(--bad);animation:none}
+  @keyframes blink{50%{opacity:.25}}
+  .hint{color:var(--dim);font-size:12.5px;margin-top:8px}
+  .filebox{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--dim);cursor:pointer;transition:.15s}
+  .filebox:hover{border-color:var(--accent);color:var(--txt)}
+  .filebox.drag{border-color:var(--accent2);background:rgba(61,220,151,.06)}
+  video{width:100%;max-width:340px;border-radius:10px;border:1px solid var(--line);margin-top:10px;display:block}
+  .metric-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+  .metric-row .m{color:var(--dim);font-size:12px}
+  footer{margin-top:30px;color:var(--dim);font-size:12px;border-top:1px solid var(--line);padding-top:14px}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">A</div>
+    <div class="brand">
+      <h1>A-Level 画质评估</h1>
+      <p>AI 生成视频技术画质等级 · A1–A10 · 世界模拟可信度</p>
+    </div>
+    <a class="gh" id="gh-link" href="#" target="_blank" rel="noopener">GitHub ↗</a>
+  </header>
+
+  <div class="tabs">
+    <button id="tab-btn-manual" class="active">✍️ 人工评分</button>
+    <button id="tab-btn-auto">🎬 自动评估</button>
+  </div>
+
+  <!-- ============ 人工评分 ============ -->
+  <section id="tab-manual" class="tab active">
+    <div class="grid2">
+      <div class="card">
+        <h3>核心维度评分 <span class="tag">必测 · 决定 A1–A7</span></h3>
+        <div id="core-dims"></div>
+        <div class="checks" style="margin-top:12px">
+          <label><input type="checkbox" id="fl-c"> 一票否决：结构严重畸形（六指/面部崩坏/文字乱码）→ 上限 A2</label>
+          <label><input type="checkbox" id="fl-b"> 一票否决：持续大幅闪烁/身份漂移 → 上限 A3</label>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h3>进阶维度 <span class="tag">A8–A10 门槛</span></h3>
+          <div id="adv-dims"></div>
+          <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+            <span style="font-size:13px;color:var(--dim)">分制</span>
+            <select id="scale"><option value="2-10" selected>2–10（方案正文）</option><option value="1-5">1–5（附录 C）</option></select>
+          </div>
+        </div>
+        <div class="card result" id="manual-result"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 自动评估 ============ -->
+  <section id="tab-auto" class="tab">
+    <div class="grid2">
+      <div class="card">
+        <h3>1 · 引擎就绪状态</h3>
+        <div class="status"><span class="dot" id="py-dot"></span><span id="py-status">尚未初始化（切换到本标签后自动加载）…</span></div>
+        <h3>2 · 选择视频</h3>
+        <div class="filebox" id="filebox">
+          <div style="font-size:26px">🎞️</div>
+          <div>点击选择或拖拽 AI 生成视频（MP4/WebM）</div>
+          <div class="hint">浏览器本地解码，视频不会上传到任何服务器</div>
+        </div>
+        <input type="file" id="file" accept="video/*" style="display:none">
+        <div id="video-box"></div>
+        <div class="hint" id="extract-info"></div>
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn" id="btn-run" disabled>运行自动评估</button>
+          <span class="hint" id="run-status"></span>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h3>3 · 自动指标结果 <span class="tag">A / B / E</span></h3>
+          <div id="metric-results"><div class="hint">选择视频并运行后显示 FFT 高频能量、时间闪烁、光流光滑度、块效应等指标。</div></div>
+        </div>
+        <div class="card">
+          <h3>4 · 人工补充评分 <span class="tag">C / D 必评</span></h3>
+          <div id="auto-manual-dims"></div>
+        </div>
+        <div class="card result" id="auto-result"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    ⚠️ 自动指标当前为占位标定（见可行性报告 §3.3），正式评级需在真实语料上重新标定；高等级（A7+）建议人工复核。<br>
+    本工具忠实实现《AI视频画质等级体系 A1–A10》v1.0 草案的权重公式、等级阈值与一票否决规则，含 3 处已知方案缺陷（见可行性报告 §1）。
+  </footer>
+</div>
+
+<script>
+// ============================================================================
+// A-Level 评估引擎 (JS 版) — 与 alevel/engine.py + spec.py 严格等价
+// 双重实现的目的: 人工评分模式无需加载 Pyodide, 浏览器内即时计算。
+// 等价性由 web/parity_test.mjs 对照 Python 引擎验证 (3125 组合全量比对)。
+// ============================================================================
+(function (root, factory) {
+  if (typeof module !== "undefined" && module.exports) module.exports = factory();
+  else root.ALEVEL_ENGINE = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  const CORE_DIMS = ["A", "B", "C", "D", "E"];
+  const ADV_DIMS = ["F", "G", "H"];
+  const WEIGHTS = { A: 0.20, B: 0.30, C: 0.20, D: 0.15, E: 0.15 };
+  const SEVERE_SCORE = 1.0;
+
+  // 与 spec.GRADES 完全一致 (min 为 2-10 分制)
+  const GRADES = [
+    { level: "A1",  public: "草稿预览",   equiv: "<720p",  min: 2.0,  core: {}, adv: {} },
+    { level: "A2",  public: "基础可用",   equiv: "≈720p",  min: 3.0,  core: {}, adv: {} },
+    { level: "A3",  public: "标清可用",   equiv: "≈1080p", min: 4.0,  core: {}, adv: {} },
+    { level: "A4",  public: "高清可用",   equiv: "≈2K",    min: 5.0,  core: { C: 3 }, adv: {} },
+    { level: "A5",  public: "高清良好",   equiv: "≈2.5K",  min: 6.0,  core: { B: 3 }, adv: {} },
+    { level: "A6",  public: "高清优秀",   equiv: "≈3K",    min: 7.0,  core: { B: 4, C: 4 }, adv: {} },
+    { level: "A7",  public: "影院级",     equiv: "等效4K",  min: 8.0,  core: { A: 4, B: 4, C: 4, D: 4, E: 4 }, adv: {} },
+    { level: "A8",  public: "超高清级",   equiv: "等效5K",  min: 8.5,  core: { A: 4.5, B: 4.5, C: 4.5, D: 4.5, E: 4.5 }, adv: { F: 4 } },
+    { level: "A9",  public: "超高清优秀", equiv: "6K-8K",   min: 9.0,  core: { A: 4.5, B: 4.5, C: 4.5, D: 4.5, E: 4.5 }, adv: { F: 4.5, G: 4 } },
+    { level: "A10", public: "世界模拟级", equiv: "8K+",     min: 9.5,  core: { A: 5, B: 5, C: 5, D: 5, E: 5 }, adv: { F: 4.5, G: 4.5, H: 4.5 } },
+  ];
+  const LEVELS = GRADES.map((g) => g.level);
+
+  const SCALES = {
+    "2-10": { mult: 2.0, mins: [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 8.5, 9.0, 9.5] },
+    "1-5":  { mult: 1.0, mins: [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.25, 4.5, 4.75] },
+  };
+  const DEFAULT_SCALE = "2-10";
+
+  const VETO = {
+    C: { flag: "c_severe", cap: "A2", reason: "结构完整性严重畸形(六指/面部崩坏/文字乱码)" },
+    B: { flag: "b_severe", cap: "A3", reason: "持续大幅闪烁或身份漂移" },
+  };
+
+  const DIM_INFO = {
+    A: { name: "有效空间分辨率", desc: "画面里有多少细节是真实、清晰的", traditional: "分辨率、锐度" },
+    B: { name: "时间稳定性", desc: "连续播放是否稳定、不闪不跳", traditional: "帧率、抖动、运动模糊" },
+    C: { name: "结构完整性", desc: "手、脸、文字等关键结构是否正常", traditional: "几何失真、畸变" },
+    D: { name: "物理一致性", desc: "光影、反射、碰撞是否合理", traditional: "色彩准确、光影真实" },
+    E: { name: "纹理自然度", desc: "表面质感是否自然, 无 AI 塑料感", traditional: "噪点、压缩伪影" },
+    F: { name: "3D 几何一致性", desc: "画面是否像真实 3D 场景, 视角变化正确", traditional: "立体感、透视" },
+    G: { name: "长期时空记忆", desc: "长视频中人物、物体是否保持一致", traditional: "角色连续性、场景一致性" },
+    H: { name: "因果与交互合理性", desc: "接触、推动等交互是否符合逻辑", traditional: "事件逻辑" },
+  };
+
+  function compositeScore(scores, scale) {
+    scale = scale || DEFAULT_SCALE;
+    for (const d of CORE_DIMS) {
+      if (!(d in scores)) throw new Error("缺少核心维度分数: " + d);
+      const v = scores[d];
+      if (!(v >= 1 && v <= 5)) throw new Error("维度 " + d + " 得分超出 1-5 范围: " + v);
+    }
+    const sc = SCALES[scale];
+    if (!sc) throw new Error("未知分制 " + scale);
+    let weighted = 0;
+    for (const d of CORE_DIMS) weighted += WEIGHTS[d] * scores[d];
+    return Math.round(weighted * sc.mult * 10000) / 10000;
+  }
+
+  function requirementsMet(level, composite, scores, adv, scale) {
+    const sc = SCALES[scale] || SCALES[DEFAULT_SCALE];
+    const idx = LEVELS.indexOf(level.level);
+    const minReq = sc.mins[idx];
+    const missing = [];
+    if (composite < minReq) missing.push("综合得分≥" + minReq + " (实际 " + composite.toFixed(2) + ")");
+    for (const d of Object.keys(level.core)) {
+      const req = level.core[d];
+      const val = scores[d] != null ? scores[d] : 0;
+      if (val < req) missing.push(d + "≥" + req + " (实际 " + val.toFixed(1) + ")");
+    }
+    for (const d of Object.keys(level.adv)) {
+      const req = level.adv[d];
+      const val = adv && adv[d] != null ? adv[d] : null;
+      if (val == null) missing.push(d + "≥" + req + " (未测)");
+      else if (val < req) missing.push(d + "≥" + req + " (实际 " + val.toFixed(1) + ")");
+    }
+    return { met: missing.length === 0, missing, min_req: minReq };
+  }
+
+  function assignGrade(scores, adv, flags, scale) {
+    scale = scale || DEFAULT_SCALE;
+    const composite = compositeScore(scores, scale);
+    adv = adv || {};
+    flags = flags || {};
+    if ((scores.C != null && scores.C <= SEVERE_SCORE) && !("c_severe" in flags)) flags.c_severe = true;
+    if ((scores.B != null && scores.B <= SEVERE_SCORE) && !("b_severe" in flags)) flags.b_severe = true;
+
+    let chosen = GRADES[0], chosenReq = null;
+    for (let i = GRADES.length - 1; i >= 0; i--) {
+      const req = requirementsMet(GRADES[i], composite, scores, adv, scale);
+      if (req.met) { chosen = GRADES[i]; chosenReq = req; break; }
+    }
+
+    let capLevel = null, capReason = null;
+    for (const dim of Object.keys(VETO)) {
+      const rule = VETO[dim];
+      if (flags[rule.flag]) { capLevel = rule.cap; capReason = rule.reason; break; }
+    }
+    let finalLevel = chosen.level;
+    if (capLevel && LEVELS.indexOf(finalLevel) > LEVELS.indexOf(capLevel)) finalLevel = capLevel;
+
+    const reqTable = GRADES.map((g) => Object.assign({ level: g.level }, requirementsMet(g, composite, scores, adv, scale)));
+
+    return {
+      level: finalLevel,
+      public: GRADES.find((g) => g.level === finalLevel).public,
+      equiv: GRADES.find((g) => g.level === finalLevel).equiv,
+      composite,
+      scale,
+      capped: finalLevel !== chosen.level,
+      capped_from: capLevel ? chosen.level : null,
+      cap_reason: capReason,
+      chosen_req: chosenReq,
+      requirements: reqTable,
+      veto: { c_severe: !!flags.c_severe, b_severe: !!flags.b_severe },
+    };
+  }
+
+  // 方案 5.2 模型能力分级 (L1-L3)
+  function modelCapability(caseResults) {
+    const med = (xs) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b); const n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+    const core = caseResults.filter((c) => (c.kind || "core") === "core").map((c) => c.composite);
+    const adv = caseResults.filter((c) => c.kind === "adv").map((c) => c.composite);
+    const coreMed = med(core), advMed = med(adv);
+    const t02 = (caseResults.find((c) => c.case === "T02") || {}).composite;
+    const t06 = (caseResults.find((c) => c.case === "T06") || {}).composite;
+    let level = null, reason = "未达 L1";
+    if (coreMed != null) {
+      if (coreMed >= 4.0 && (advMed || 0) >= 3.5) { level = "L3"; reason = "核心中位数 " + coreMed.toFixed(2) + "≥4.0, 进阶中位数 " + (advMed || 0).toFixed(2) + "≥3.5"; }
+      else if (coreMed >= 3.5 && (advMed || 0) >= 3.0) { level = "L2"; reason = "核心中位数 " + coreMed.toFixed(2) + "≥3.5, 进阶中位数 " + (advMed || 0).toFixed(2) + "≥3.0"; }
+      else if (coreMed >= 3.0 && (t02 || 0) >= 3.0 && (t06 || 0) >= 3.0) { level = "L1"; reason = "核心中位数 " + coreMed.toFixed(2) + "≥3.0 且 T02=" + (t02 || 0) + ", T06=" + (t06 || 0) + " 均≥3.0"; }
+      else reason = "核心中位数 " + coreMed.toFixed(2) + ", T02=" + (t02 || 0) + ", T06=" + (t06 || 0) + " 未达 L1 要求";
+    }
+    return { level, reason, stats: { core_median: coreMed, adv_median: advMed, T02: t02, T06: t06 } };
+  }
+
+  return { CORE_DIMS, ADV_DIMS, WEIGHTS, GRADES, LEVELS, SCALES, DEFAULT_SCALE, VETO, DIM_INFO, compositeScore, requirementsMet, assignGrade, modelCapability };
+});
+
+</script>
+<script>
+const PY_MODULES = {"spec.py": "# -*- coding: utf-8 -*-\n\"\"\"A-Level 认证体系规格定义 (基于《AI视频画质等级体系 A1-A10 完整构建方案》v1.0 草案)\n\n本模块集中承载方案中的全部\"规则\"：维度权重、等级阈值、一票否决、测试用例与\n指标标定参数。评级引擎 (engine.py) 只读取本文件的声明，不写死任何阈值，\n便于方案修订时直接改配置。\n\n注意：方案 3.2 的综合得分公式 (加权和 x2, 映射到 2-10 分制) 与附录 C 的\n\"综合得分 4.1\" 不一致，本实现以 3.2/3.3 的正交规范为准，另提供 1-5 分制模式\n(见 SCALES)，并在可行性报告中说明该矛盾。\n\"\"\"\n\n# ---------------------------------------------------------------- 维度 ----\nCORE_DIMS = [\"A\", \"B\", \"C\", \"D\", \"E\"]           # 核心五项 (必测, 决定 A1-A7)\nADV_DIMS = [\"F\", \"G\", \"H\"]                      # 进阶三项 (A8-A10 及模型能力校验)\nALL_DIMS = CORE_DIMS + ADV_DIMS\n\nDIM_INFO = {\n    \"A\": {\"name\": \"有效空间分辨率\", \"desc\": \"画面里有多少细节是真实、清晰的\", \"traditional\": \"分辨率、锐度\"},\n    \"B\": {\"name\": \"时间稳定性\", \"desc\": \"连续播放是否稳定、不闪不跳\", \"traditional\": \"帧率、抖动、运动模糊\"},\n    \"C\": {\"name\": \"结构完整性\", \"desc\": \"手、脸、文字等关键结构是否正常\", \"traditional\": \"几何失真、畸变\"},\n    \"D\": {\"name\": \"物理一致性\", \"desc\": \"光影、反射、碰撞是否合理\", \"traditional\": \"色彩准确、光影真实\"},\n    \"E\": {\"name\": \"纹理自然度\", \"desc\": \"表面质感是否自然, 无 AI 塑料感\", \"traditional\": \"噪点、压缩伪影\"},\n    \"F\": {\"name\": \"3D 几何一致性\", \"desc\": \"画面是否像真实 3D 场景, 视角变化正确\", \"traditional\": \"立体感、透视\"},\n    \"G\": {\"name\": \"长期时空记忆\", \"desc\": \"长视频中人物、物体是否保持一致\", \"traditional\": \"角色连续性、场景一致性\"},\n    \"H\": {\"name\": \"因果与交互合理性\", \"desc\": \"接触、推动等交互是否符合逻辑\", \"traditional\": \"事件逻辑\"},\n}\n\n# 权重 (方案 3.2): B(时间稳定性) 权重最高 0.30, 符合 AI 视频最大痛点是时间闪烁的判断\nWEIGHTS = {\"A\": 0.20, \"B\": 0.30, \"C\": 0.20, \"D\": 0.15, \"E\": 0.15}\nassert abs(sum(WEIGHTS.values()) - 1.0) < 1e-9\n\n# 分数制: 2-10 为方案正文 (3.2/3.3) 的分制; 1-5 为附录 C 使用的分制 (兼容模式)\nSCALES = {\n    \"2-10\": {\"multiplier\": 2.0, \"grade_min\": [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 8.5, 9.0, 9.5]},\n    \"1-5\":  {\"multiplier\": 1.0, \"grade_min\": [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.25, 4.5, 4.75]},\n}\nDEFAULT_SCALE = \"2-10\"\n\n# ---------------------------------------------------------------- 等级表 ----\n# 每个等级: 综合分下限 + 核心项最低要求(缺失表示无额外要求) + 进阶项要求(缺失表示无)\n# 注意 A4 起核心项要求逐级收紧, 与\"公众定位/等效技术画质\"一一对应\nGRADES = [\n    {\"level\": \"A1\",  \"public\": \"草稿预览\",   \"equiv\": \"<720p\", \"min\": 2.0,  \"core\": {}, \"adv\": {}},\n    {\"level\": \"A2\",  \"public\": \"基础可用\",   \"equiv\": \"≈720p\", \"min\": 3.0,  \"core\": {}, \"adv\": {}},\n    {\"level\": \"A3\",  \"public\": \"标清可用\",   \"equiv\": \"≈1080p\",\"min\": 4.0,  \"core\": {}, \"adv\": {}},\n    {\"level\": \"A4\",  \"public\": \"高清可用\",   \"equiv\": \"≈2K\",   \"min\": 5.0,  \"core\": {\"C\": 3}, \"adv\": {}},\n    {\"level\": \"A5\",  \"public\": \"高清良好\",   \"equiv\": \"≈2.5K\", \"min\": 6.0,  \"core\": {\"B\": 3}, \"adv\": {}},\n    {\"level\": \"A6\",  \"public\": \"高清优秀\",   \"equiv\": \"≈3K\",   \"min\": 7.0,  \"core\": {\"B\": 4, \"C\": 4}, \"adv\": {}},\n    {\"level\": \"A7\",  \"public\": \"影院级\",     \"equiv\": \"等效4K\", \"min\": 8.0,  \"core\": {\"A\": 4, \"B\": 4, \"C\": 4, \"D\": 4, \"E\": 4}, \"adv\": {}},\n    {\"level\": \"A8\",  \"public\": \"超高清级\",   \"equiv\": \"等效5K\", \"min\": 8.5,  \"core\": {\"A\": 4.5, \"B\": 4.5, \"C\": 4.5, \"D\": 4.5, \"E\": 4.5}, \"adv\": {\"F\": 4}},\n    {\"level\": \"A9\",  \"public\": \"超高清优秀\", \"equiv\": \"6K-8K\",  \"min\": 9.0,  \"core\": {\"A\": 4.5, \"B\": 4.5, \"C\": 4.5, \"D\": 4.5, \"E\": 4.5}, \"adv\": {\"F\": 4.5, \"G\": 4}},\n    {\"level\": \"A10\", \"public\": \"世界模拟级\", \"equiv\": \"8K+\",    \"min\": 9.5,  \"core\": {\"A\": 5, \"B\": 5, \"C\": 5, \"D\": 5, \"E\": 5}, \"adv\": {\"F\": 4.5, \"G\": 4.5, \"H\": 4.5}},\n]\nLEVELS = [g[\"level\"] for g in GRADES]\n\n# 一票否决 (方案 3.4)。\"严重\"的可操作定义: 该维度得分==1 或显式 flag。\n# 注: 身份漂移本属 G 维度, 方案将其列为 B 级否决, 此处按方案原文实现 (b_severe)。\nVETO = {\n    \"C\": {\"flag\": \"c_severe\", \"cap\": \"A2\", \"reason\": \"结构完整性严重畸形(六指/面部崩坏/文字乱码)\"},\n    \"B\": {\"flag\": \"b_severe\", \"cap\": \"A3\", \"reason\": \"持续大幅闪烁或身份漂移\"},\n}\nSEVERE_SCORE = 1.0   # 维度得分==该值时视为\"严重\"\n\n# ---------------------------------------------------------------- 测试用例 ----\nTEST_CASES = {\n    \"T01\": {\"desc\": \"静态人像特写(正面、自然光)\", \"dims\": [\"C\", \"E\"], \"diff\": \"低\", \"kind\": \"core\"},\n    \"T02\": {\"desc\": \"手部特写动作(抓取、指向)\", \"dims\": [\"C\", \"B\"], \"diff\": \"高\", \"kind\": \"core\"},\n    \"T03\": {\"desc\": \"液体倾倒(水、牛奶)\", \"dims\": [\"D\", \"B\", \"E\"], \"diff\": \"中\", \"kind\": \"core\"},\n    \"T04\": {\"desc\": \"快速运动(奔跑、车辆)\", \"dims\": [\"B\", \"A\"], \"diff\": \"中\", \"kind\": \"core\"},\n    \"T05\": {\"desc\": \"复杂光照(逆光、多光源)\", \"dims\": [\"D\", \"A\"], \"diff\": \"中\", \"kind\": \"core\"},\n    \"T06\": {\"desc\": \"文字生成(招牌、书本)\", \"dims\": [\"C\"], \"diff\": \"高\", \"kind\": \"core\"},\n    \"T07\": {\"desc\": \"长镜头(>30秒, 固定机位)\", \"dims\": [\"G\", \"B\"], \"diff\": \"高\", \"kind\": \"core\"},\n    \"T08\": {\"desc\": \"多物体交互(推箱子、握手)\", \"dims\": [\"H\", \"D\"], \"diff\": \"高\", \"kind\": \"core\"},\n    \"T09\": {\"desc\": \"旋转镜头环绕主体\", \"dims\": [\"F\", \"B\"], \"diff\": \"-\", \"kind\": \"adv\"},\n    \"T10\": {\"desc\": \"镜面反射(镜子、水面)\", \"dims\": [\"D\", \"F\"], \"diff\": \"-\", \"kind\": \"adv\"},\n    \"T11\": {\"desc\": \"布料/流体动态(旗帜、烟雾)\", \"dims\": [\"D\", \"E\", \"B\"], \"diff\": \"-\", \"kind\": \"adv\"},\n    \"T12\": {\"desc\": \"3D 场景漫游(室内/室外)\", \"dims\": [\"F\", \"G\"], \"diff\": \"-\", \"kind\": \"adv\"},\n}\n\n# 模型能力分级 (方案 5.2)\nMODEL_LEVELS = [\n    {\"id\": \"L1\", \"name\": \"基础可用\", \"req\": \"核心用例综合得分中位数>=3.0 且 T02/T06 得分>=3.0\"},\n    {\"id\": \"L2\", \"name\": \"可靠生成\", \"req\": \"核心用例中位数>=3.5, 进阶用例中位数>=3.0\"},\n    {\"id\": \"L3\", \"name\": \"世界模拟级\", \"req\": \"核心用例中位数>=4.0, 进阶用例中位数>=3.5\"},\n]\n\n# ------------------------------------------------------------- 标定参数 ----\n# 自动指标 -> 1-5 分 的线性映射 (占位默认值, 需在真实语料上重新标定! 见可行性报告)\n# 每个指标给出 (score_at_low, metric_at_low, score_at_high, metric_at_high) 的线性插值端点\nCALIBRATION = {\n    # A 维度\n    \"hf_ratio\":      {\"low\": (1.0, 0.04), \"high\": (5.0, 0.20)},      # 频域高频能量占比\n    \"res_retention\": {\"low\": (1.0, 0.75), \"high\": (5.0, 0.96)},      # 降采样-恢复保真度 (NCC)\n    # B 维度\n    \"flicker\":       {\"low\": (5.0, 0.02), \"high\": (1.0, 0.40)},      # 时间域高频能量占比 (0..1)\n    \"flow_smooth\":   {\"low\": (1.0, 0.10), \"high\": (5.0, 0.02)},      # 光流运动场光滑度 (均值绝对散度)\n    # E 维度\n    \"blocking\":      {\"low\": (5.0, 0.02), \"high\": (1.0, 0.20)},      # 块效应强度\n}\n", "util.py": "# -*- coding: utf-8 -*-\n\"\"\"共享数值工具 (纯 numpy)。\"\"\"\nfrom __future__ import annotations\n\nimport numpy as np\n\n\ndef ncc(a: np.ndarray, b: np.ndarray) -> float:\n    \"\"\"归一化互相关 (1=完全一致)。数值稳定实现, 避免对近平稳信号除零。\n\n    压缩微噪声可能让原帧 std≈1e-7 而降采样恢复后 std≈0 (相差几个量级),\n    np.corrcoef 此时会产生 NaN; 此处对零方差信号显式处理。\n    \"\"\"\n    a = a.astype(np.float32).ravel()\n    b = b.astype(np.float32).ravel()\n    da = a - a.mean()\n    db = b - b.mean()\n    va = float((da * da).sum())\n    vb = float((db * db).sum())\n    if va < 1e-12 and vb < 1e-12:\n        return 1.0 if np.allclose(a, b) else 0.0\n    if va < 1e-12 or vb < 1e-12:\n        return 0.0\n    c = float((da * db).sum()) / float(np.sqrt(va * vb))\n    return float(np.clip(c, -1.0, 1.0))\n\n\ndef resize(frames: np.ndarray, width: int) -> np.ndarray:\n    \"\"\"面积平均降采样到指定宽度 (保持宽高比)。\"\"\"\n    n, h, w = frames.shape\n    if w <= width:\n        return frames\n    f = float(w) / width\n    h2 = max(1, int(h / f))\n    w2 = width\n    out = np.empty((n, h2, w2), dtype=np.float32)\n    for i in range(n):\n        out[i] = _downscale_arbitrary(frames[i], h2, w2)\n    return out\n\n\ndef _downscale_arbitrary(f: np.ndarray, h2: int, w2: int) -> np.ndarray:\n    h, w = f.shape\n    ys = (np.linspace(0, h, h2 + 1)).astype(int)\n    xs = (np.linspace(0, w, w2 + 1)).astype(int)\n    out = np.empty((h2, w2), dtype=np.float32)\n    for i in range(h2):\n        for j in range(w2):\n            out[i, j] = f[ys[i]:ys[i + 1], xs[j]:xs[j + 1]].mean()\n    return out\n\n\ndef conv2d(f: np.ndarray, k: np.ndarray) -> np.ndarray:\n    \"\"\"2D 相关卷积 (valid 模式, 步长1), 用于小卷积核。\"\"\"\n    kh, kw = k.shape\n    h, w = f.shape\n    out = np.zeros((h - kh + 1, w - kw + 1), dtype=np.float32)\n    for i in range(kh):\n        for j in range(kw):\n            out += k[i, j] * f[i:i + h - kh + 1, j:j + w - kw + 1]\n    return out\n", "engine.py": "# -*- coding: utf-8 -*-\n\"\"\"A-Level 评级引擎: 综合得分计算 / 等级判定 / 一票否决 / 需求核查\n\n只依赖标准库。所有阈值均来自 spec.py, 本文件不含魔法数字。\n\"\"\"\nfrom __future__ import annotations\n\nfrom typing import Dict, List, Optional\n\nfrom . import spec\n\n\nclass GradeError(ValueError):\n    \"\"\"评分输入不合法。\"\"\"\n\n\ndef composite_score(scores: Dict[str, float], scale: str = spec.DEFAULT_SCALE) -> float:\n    \"\"\"按方案 3.2 计算综合得分: (Σ w_i * s_i) * multiplier。\n\n    scores 需包含全部核心五项 (A-E), 值域 1..5。进阶维度 (F-H) 不参与综合得分。\n    \"\"\"\n    missing = [d for d in spec.CORE_DIMS if d not in scores]\n    if missing:\n        raise GradeError(f\"缺少核心维度分数: {missing}\")\n    for d, v in scores.items():\n        if d not in spec.CORE_DIMS:\n            continue\n        if not (1.0 <= v <= 5.0):\n            raise GradeError(f\"维度 {d} 得分 {v} 超出 1-5 范围\")\n    if scale not in spec.SCALES:\n        raise GradeError(f\"未知分制 {scale}, 可选: {list(spec.SCALES)}\")\n    weighted = sum(spec.WEIGHTS[d] * scores[d] for d in spec.CORE_DIMS)\n    return round(weighted * spec.SCALES[scale][\"multiplier\"], 4)\n\n\ndef _grade_min(scale: str) -> List[float]:\n    return spec.SCALES[scale][\"grade_min\"]\n\n\ndef requirements_met(level: Dict, composite: float, scores: Dict[str, float],\n                     adv: Optional[Dict[str, float]], scale: str) -> Dict:\n    \"\"\"检查单个等级的全部要求, 返回 {met, missing[]}。\n\n    adv 为进阶维度得分; 缺失 (None) 的进阶维度视为\"未测/未满足\"。\n    \"\"\"\n    mins = _grade_min(scale)\n    idx = spec.LEVELS.index(level[\"level\"])\n    min_req = mins[idx]\n    missing: List[str] = []\n    if composite < min_req:\n        missing.append(f\"综合得分≥{min_req} (实际 {composite:.2f})\")\n    for d, req in level[\"core\"].items():\n        if scores.get(d, 0) < req:\n            missing.append(f\"{d}≥{req} (实际 {scores.get(d):.1f})\")\n    for d, req in level[\"adv\"].items():\n        val = (adv or {}).get(d)\n        if val is None:\n            missing.append(f\"{d}≥{req} (未测)\")\n        elif val < req:\n            missing.append(f\"{d}≥{req} (实际 {val:.1f})\")\n    return {\"met\": not missing, \"missing\": missing, \"min_req\": min_req}\n\n\ndef assign_grade(scores: Dict[str, float], adv: Optional[Dict[str, float]] = None,\n                 flags: Optional[Dict[str, bool]] = None,\n                 scale: str = spec.DEFAULT_SCALE) -> Dict:\n    \"\"\"从核心/进阶得分判定等级。\n\n    逻辑: 从最高级往下找第一个满足全部要求的等级; 再应用一票否决上限。\n    flags: {\"c_severe\": bool, \"b_severe\": bool}, 缺省按\"维度得分==1\"自动判定。\n    返回: {level, composite, capped, cap_reason, requirements: [...], veto: {...}}\n    \"\"\"\n    composite = composite_score(scores, scale)\n    adv = {k: float(v) for k, v in (adv or {}).items()}\n    flags = dict(flags or {})\n    # 自动判定严重 (方案 3.4 的可操作化)\n    if scores.get(\"C\", 5) <= spec.SEVERE_SCORE:\n        flags.setdefault(\"c_severe\", True)\n    if scores.get(\"B\", 5) <= spec.SEVERE_SCORE:\n        flags.setdefault(\"b_severe\", True)\n\n    # 1) 从最高级向下找第一个满足的等级\n    chosen = spec.GRADES[0]\n    chosen_req = None\n    for g in reversed(spec.GRADES):\n        req = requirements_met(g, composite, scores, adv, scale)\n        if req[\"met\"]:\n            chosen = g\n            chosen_req = req\n            break\n\n    # 2) 一票否决: 应用 cap\n    cap_level: Optional[str] = None\n    cap_reason: Optional[str] = None\n    for dim, rule in spec.VETO.items():\n        if flags.get(rule[\"flag\"]):\n            cap_level = rule[\"cap\"]\n            cap_reason = rule[\"reason\"]\n            break\n    final_level = chosen[\"level\"]\n    if cap_level and spec.LEVELS.index(final_level) > spec.LEVELS.index(cap_level):\n        final_level = cap_level\n\n    # 3) 逐级列出要求核查, 便于报告\n    req_table = []\n    for g in spec.GRADES:\n        r = requirements_met(g, composite, scores, adv, scale)\n        req_table.append({\"level\": g[\"level\"], **r})\n\n    return {\n        \"level\": final_level,\n        \"public\": next(g[\"public\"] for g in spec.GRADES if g[\"level\"] == final_level),\n        \"equiv\": next(g[\"equiv\"] for g in spec.GRADES if g[\"level\"] == final_level),\n        \"composite\": composite,\n        \"scale\": scale,\n        \"capped\": final_level != chosen[\"level\"],\n        \"capped_from\": chosen[\"level\"] if cap_level else None,\n        \"cap_reason\": cap_reason,\n        \"chosen_req\": chosen_req,\n        \"requirements\": req_table,\n        \"veto\": {\"c_severe\": bool(flags.get(\"c_severe\")), \"b_severe\": bool(flags.get(\"b_severe\"))},\n    }\n\n\ndef model_capability(case_results: List[Dict]) -> Dict:\n    \"\"\"方案 5.2 模型能力分级 (L1-L3)。\n\n    case_results: [{\"case\": \"T01\", \"composite\": float, \"scores\": {...}}, ...]\n    返回 {level, reason, stats}。\n    \"\"\"\n    core_cases = [c for c in case_results if spec.TEST_CASES.get(c[\"case\"], {}).get(\"kind\") == \"core\"]\n    adv_cases = [c for c in case_results if spec.TEST_CASES.get(c[\"case\"], {}).get(\"kind\") == \"adv\"]\n    def med(xs):\n        if not xs:\n            return None\n        s = sorted(xs)\n        n = len(s)\n        return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2\n    core_med = med([c[\"composite\"] for c in core_cases])\n    adv_med = med([c[\"composite\"] for c in adv_cases])\n    t02 = next((c[\"composite\"] for c in core_cases if c[\"case\"] == \"T02\"), None)\n    t06 = next((c[\"composite\"] for c in core_cases if c[\"case\"] == \"T06\"), None)\n    reason, level = \"未达 L1\", None\n    if core_med is not None:\n        if core_med >= 4.0 and (adv_med or 0) >= 3.5:\n            level, reason = \"L3\", f\"核心中位数 {core_med:.2f}≥4.0, 进阶中位数 {adv_med:.2f}≥3.5\"\n        elif core_med >= 3.5 and (adv_med or 0) >= 3.0:\n            level, reason = \"L2\", f\"核心中位数 {core_med:.2f}≥3.5, 进阶中位数 {adv_med:.2f}≥3.0\"\n        elif core_med >= 3.0 and (t02 or 0) >= 3.0 and (t06 or 0) >= 3.0:\n            level, reason = \"L1\", f\"核心中位数 {core_med:.2f}≥3.0 且 T02={t02}, T06={t06} 均≥3.0\"\n        else:\n            reason = (f\"核心中位数 {core_med:.2f}, T02={t02}, T06={t06} 未达 L1 要求\")\n    return {\"level\": level, \"reason\": reason,\n            \"stats\": {\"core_median\": core_med, \"adv_median\": adv_med, \"T02\": t02, \"T06\": t06}}\n", "spatial.py": "# -*- coding: utf-8 -*-\n\"\"\"A 维度 (有效空间分辨率) 自动指标 — 纯 numpy 实现。\n\n1. hf_ratio:      频域高频能量占比 (FFT 径向谱), 高 = 细节丰富。\n2. res_retention: 降采样-恢复保真度: 把帧缩小再放大回原尺寸, 与原帧比较。\n                  真实细节在缩放后能较好保留; AI \"假细节\" (纹理涂抹/过度锐化)\n                  在缩放往返中漂移更大。用 NCC 衡量保留度。\n二者综合映射到 1-5 分。标定参数见 spec.CALIBRATION, 均需在真实语料上重新标定。\n\"\"\"\nfrom __future__ import annotations\n\nfrom typing import Dict\n\nimport numpy as np\n\nfrom .. import spec\nfrom . import util\n\n\ndef _lin(metric: str, value: float) -> float:\n    c = spec.CALIBRATION[metric]\n    (s0, m0), (s1, m1) = c[\"low\"], c[\"high\"]\n    t = (value - m0) / (m1 - m0)\n    return float(np.clip(s0 + (s1 - s0) * t, 1.0, 5.0))\n\n\ndef hf_ratio(frames: np.ndarray, r_cutoff: float = 0.25) -> float:\n    \"\"\"FFT 高频能量占比: 半径 > r_cutoff*max_freq 的环形带能量 / 总能量。\"\"\"\n    ratios = []\n    for f in frames:\n        fft = np.fft.fftshift(np.fft.fft2(f))\n        power = np.abs(fft) ** 2\n        h, w = power.shape\n        yy, xx = np.mgrid[-h // 2:h // 2, -w // 2:w // 2]\n        r = np.sqrt(xx.astype(float) ** 2 + yy.astype(float) ** 2)\n        rmax = np.sqrt((h / 2) ** 2 + (w / 2) ** 2)\n        total = power.sum()\n        if total <= 0:\n            ratios.append(0.0)\n            continue\n        hi = power[r > r_cutoff * rmax].sum()\n        ratios.append(float(hi / total))\n    return float(np.mean(ratios)) if ratios else 0.0\n\n\ndef _downscale(f: np.ndarray, factor: int = 2) -> np.ndarray:\n    \"\"\"面积平均降采样 (2x2 block mean)。\"\"\"\n    h, w = f.shape[:2]\n    h2, w2 = h // factor, w // factor\n    return f[:h2 * factor, :w2 * factor].reshape(h2, factor, w2, factor).mean(axis=(1, 3))\n\n\ndef _bilinear_upscale(f: np.ndarray, shape) -> np.ndarray:\n    \"\"\"双线性放大回目标尺寸。\"\"\"\n    h, w = shape\n    sh, sw = f.shape[:2]\n    ys = np.linspace(0, sh - 1, h)\n    xs = np.linspace(0, sw - 1, w)\n    y0 = np.floor(ys).astype(int).clip(0, sh - 2)\n    x0 = np.floor(xs).astype(int).clip(0, sw - 2)\n    dy = (ys - y0)[:, None]\n    dx = (xs - x0)[None, :]\n    out = (f[y0][:, x0] * (1 - dy) * (1 - dx)\n           + f[y0][:, x0 + 1] * (1 - dy) * dx\n           + f[y0 + 1][:, x0] * dy * (1 - dx)\n           + f[y0 + 1][:, x0 + 1] * dy * dx)\n    return out\n\n\ndef res_retention(frames: np.ndarray, factor: int = 2) -> float:\n    \"\"\"降采样-恢复保真度 (NCC)。1 = 完美保留。\"\"\"\n    nccs = []\n    for f in frames:\n        small = _downscale(f, factor)\n        back = _bilinear_upscale(small, f.shape)\n        nccs.append(util.ncc(f, back))\n    return float(np.mean(nccs)) if nccs else 0.0\n\n\ndef evaluate(frames: np.ndarray) -> Dict:\n    \"\"\"综合 A 维度自动得分 (1-5)。\"\"\"\n    hr = hf_ratio(frames)\n    ret = res_retention(frames)\n    s_hr = _lin(\"hf_ratio\", hr)\n    s_ret = _lin(\"res_retention\", ret)\n    score = float(np.clip(0.35 * s_hr + 0.65 * s_ret, 1.0, 5.0))\n    return {\n        \"dim\": \"A\", \"score\": round(score, 2), \"confidence\": \"medium\",\n        \"metrics\": {\"hf_ratio\": round(hr, 4), \"res_retention\": round(ret, 4)},\n        \"note\": \"A 为「有效分辨率」: 高分辨率不等于高画质, 此得分衡量可保留的真实细节量\",\n    }\n", "temporal.py": "# -*- coding: utf-8 -*-\n\"\"\"B 维度 (时间稳定性) 自动指标 — 纯 numpy 实现。\n\n1. flicker:      时间二阶差分 (帧差的时间导数) 的均值, 衡量闪烁/抖动。\n                 恒定画面=0; 匀速运动=低; 闪烁/抽帧=高。\n2. flow_smooth:  块匹配光流运动场的光滑度 (均值绝对散度)。真实运动场平滑,\n                 AI 抖动/形变会在流场上产生尖刺。\n综合映射到 1-5 分。\n\"\"\"\nfrom __future__ import annotations\n\nfrom typing import Dict\n\nimport numpy as np\n\nfrom .. import spec\nfrom . import util\n\n\ndef _lin(metric: str, value: float) -> float:\n    c = spec.CALIBRATION[metric]\n    (s0, m0), (s1, m1) = c[\"low\"], c[\"high\"]\n    t = (value - m0) / (m1 - m0)\n    return float(np.clip(s0 + (s1 - s0) * t, 1.0, 5.0))\n\n\ndef flicker_index(frames: np.ndarray) -> float:\n    \"\"\"闪烁指数: 时间域高频能量占比 (0..1)。\n\n    对每像素做时间轴 FFT: 纯交替闪烁 (0.8/0.2/0.8...) 的能量集中在奈奎斯特\n    频率附近 → 比值≈1; 匀速运动能量集中在低频 → 比值小; 静止画面无能量 → 0。\n    附赠 accel (时间二阶差分均值) 作为不规则抖动的辅助诊断。\n    \"\"\"\n    n = len(frames)\n    if n < 4:\n        return 0.0\n    # 先减去时间均值 (DC), 否则平均亮度会淹没交替/高频能量\n    centered = frames - frames.mean(axis=0, keepdims=True)\n    power = np.abs(np.fft.fft(centered, axis=0)) ** 2        # (N, H, W)\n    k = np.arange(n)                                        # 时间频域 bin 索引\n    high = (k > 0.35 * n / 2) & (k < n - 0.35 * n / 2)\n    total = power.sum(axis=0)\n    hi = power[high].sum(axis=0)\n    valid = total > 1e-6\n    ratios = np.where(valid, hi / np.maximum(total, 1e-12), 0.0)\n    accel = 0.0\n    if n >= 3:\n        diffs = np.abs(np.diff(frames, axis=0))\n        accel = float(np.abs(np.diff(diffs, axis=0)).mean())\n    return float(ratios.mean())\n\n\ndef block_flow(frames: np.ndarray, block: int = 16, search: int = 8,\n               step: int = 8) -> np.ndarray:\n    \"\"\"朴素块匹配光流 (纯 numpy), 返回 flow (N-1, ny, nx, 2)。\n\n    在 128px 左右的小图上运行以保证速度; 仅用于运动场光滑度统计。\n    \"\"\"\n    fr = frames\n    if fr.shape[1] > 160:\n        fr = util.resize(fr, 160)\n    n, h, w = fr.shape\n    flows = []\n    yy, xx = np.mgrid[0:h - block + 1:step, 0:w - block + 1:step]\n    anchors = np.stack([yy.ravel(), xx.ravel()], axis=1)\n    ny, nx = yy.shape\n    for t in range(n - 1):\n        f0, f1 = fr[t], fr[t + 1]\n        flow = np.zeros((ny * nx, 2), dtype=np.float32)\n        for k, (ay, ax) in enumerate(anchors):\n            blk = f0[ay:ay + block, ax:ax + block]\n            best, best_sad = (0, 0), np.inf\n            for dy in range(-search, search + 1):\n                for dx in range(-search, search + 1):\n                    y1, x1 = ay + dy, ax + dx\n                    if y1 < 0 or x1 < 0 or y1 + block > h or x1 + block > w:\n                        continue\n                    sad = np.abs(blk - f1[y1:y1 + block, x1:x1 + block]).mean()\n                    if sad < best_sad:\n                        best_sad, best = sad, (dy, dx)\n            flow[k] = best\n        flows.append(flow.reshape(ny, nx, 2))\n    return np.stack(flows) if flows else np.zeros((0, ny, nx, 2))\n\n\ndef flow_smoothness(flow: np.ndarray) -> float:\n    \"\"\"运动场光滑度: 均值绝对散度 (0 = 完全平滑)。\"\"\"\n    if flow.shape[0] == 0:\n        return 0.0\n    du_dx = np.abs(np.diff(flow[..., 0], axis=2))\n    dv_dy = np.abs(np.diff(flow[..., 1], axis=1))\n    return float(np.mean(np.concatenate([du_dx.ravel(), dv_dy.ravel()])))\n\n\ndef evaluate(frames: np.ndarray, lite: bool = False) -> Dict:\n    \"\"\"综合 B 维度自动得分 (1-5)。\n\n    lite=True 用于浏览器 (Pyodide) 端: 缩小搜索窗与网格, 控制计算量。\n    \"\"\"\n    fl = flicker_index(frames)\n    if lite:\n        f2 = util.resize(frames, 96) if frames.shape[1] > 96 else frames\n        flow = block_flow(f2, block=16, search=3, step=16)\n    else:\n        flow = block_flow(frames)\n    fs = flow_smoothness(flow)\n    s_fl = _lin(\"flicker\", fl)\n    s_fs = _lin(\"flow_smooth\", fs)\n    score = float(np.clip(0.6 * s_fl + 0.4 * s_fs, 1.0, 5.0))\n    return {\n        \"dim\": \"B\", \"score\": round(score, 2), \"confidence\": \"medium\",\n        \"metrics\": {\"flicker\": round(fl, 5), \"flow_smoothness\": round(fs, 5)},\n        \"note\": \"B 权重最高(0.30), 是 AI 视频最大痛点; 闪烁/抽帧会显著拉低等级\",\n    }\n", "texture.py": "# -*- coding: utf-8 -*-\n\"\"\"E 维度 (纹理自然度) 自动指标 — 纯 numpy 实现。\n\n1. blocking: 块效应强度 (8x8 分块边界处的边缘不连续度)。压缩/AI 伪影通常\n             在块边界产生异常梯度。\n2. 噪声/细节诊断: Laplacian 响应 MAD, 区分\"过度平滑的塑料感\"与\"颗粒噪点\"。\nE 维度与主观审美高度相关, 自动指标只能作弱代理; 建议配合人工评分。\n\"\"\"\nfrom __future__ import annotations\n\nfrom typing import Dict\n\nimport numpy as np\n\nfrom .. import spec\nfrom . import util\n\n\ndef _lin(metric: str, value: float) -> float:\n    c = spec.CALIBRATION[metric]\n    (s0, m0), (s1, m1) = c[\"low\"], c[\"high\"]\n    t = (value - m0) / (m1 - m0)\n    return float(np.clip(s0 + (s1 - s0) * t, 1.0, 5.0))\n\n\ndef blocking_artifact(frames: np.ndarray, block: int = 8) -> float:\n    \"\"\"块效应: 块边界两侧梯度 与 块内梯度 的比值偏离 1 的程度。\"\"\"\n    vals = []\n    for f in frames:\n        g = np.abs(np.diff(f, axis=1))  # 水平梯度 (H, W-1)\n        h, w = g.shape\n        boundary_idx = np.arange(block - 1, w, block)\n        inside_idx = np.setdiff1d(np.arange(w), boundary_idx)\n        gb = g[:, boundary_idx].mean() if boundary_idx.size else 0.0\n        gi = g[:, inside_idx].mean() if inside_idx.size else 0.0\n        if gi > 1e-6:\n            vals.append(abs(gb / gi - 1.0))\n    return float(np.mean(vals)) if vals else 0.0\n\n\ndef detail_stats(frames: np.ndarray) -> Dict:\n    \"\"\"细节/噪声诊断信息 (不直接打分, 供人工参考)。\"\"\"\n    laps = []\n    k = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float32)\n    for f in frames[:: max(1, len(frames) // 10)]:\n        lap = util.conv2d(f, k)\n        laps.append(lap)\n    all_lap = np.stack(laps)\n    return {\n        \"laplacian_mad\": float(np.median(np.abs(all_lap - np.median(all_lap)))),\n        \"laplacian_std\": float(all_lap.std()),\n        \"mean_luminance\": float(frames.mean()),\n    }\n\n\ndef evaluate(frames: np.ndarray) -> Dict:\n    \"\"\"综合 E 维度自动得分 (1-5)。\"\"\"\n    blk = blocking_artifact(frames)\n    s = _lin(\"blocking\", blk)\n    score = float(np.clip(s, 1.0, 5.0))\n    return {\n        \"dim\": \"E\", \"score\": round(score, 2), \"confidence\": \"low\",\n        \"metrics\": {\"blocking\": round(blk, 5), **detail_stats(frames)},\n        \"note\": \"E 为弱代理指标: 纹理质感高度主观, 强烈建议人工复核\",\n    }\n"};
+</script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+"use strict";
+const ENG = (typeof ALEVEL_ENGINE !== "undefined") ? ALEVEL_ENGINE : null;
+
+/* ---------------- 通用: 维度滑块 ---------------- */
+function dimSlider(container, dim, opts) {
+  const info = ENG.DIM_INFO[dim];
+  const box = document.createElement("div");
+  box.className = "dim";
+  box.innerHTML = '<div class="head"><span><span class="code">' + dim + '</span> <span class="name">' + info.name + '</span></span>'
+    + '<span class="val" id="val-' + dim + '">' + (opts.value || 3) + '</span></div>'
+    + '<div class="desc">' + info.desc + '</div>'
+    + '<input type="range" min="1" max="5" step="0.5" value="' + (opts.value || 3) + '" data-dim="' + dim + '">';
+  container.appendChild(box);
+  const input = box.querySelector("input");
+  input.addEventListener("input", () => {
+    document.getElementById("val-" + dim).textContent = parseFloat(input.value).toFixed(1).replace(/\.0$/, "");
+    if (opts.onChange) opts.onChange();
+  });
+  return input;
+}
+
+/* ---------------- 人工评分 ---------------- */
+function currentManualScores() {
+  const scores = {};
+  ENG.CORE_DIMS.forEach(d => scores[d] = parseFloat(document.querySelector('#core-dims input[data-dim="' + d + '"]').value));
+  ENG.ADV_DIMS.forEach(d => {
+    const el = document.querySelector('#adv-dims input[data-dim="' + d + '"]');
+    scores[d] = el.disabled ? null : parseFloat(el.value);
+  });
+  return scores;
+}
+function currentFlags() {
+  return { c_severe: document.getElementById("fl-c").checked, b_severe: document.getElementById("fl-b").checked };
+}
+function renderGradeInto(container, scores, flags, scale, meta) {
+  container.classList.add("show");
+  const adv = {};
+  ENG.ADV_DIMS.forEach(d => { if (scores[d] != null) adv[d] = scores[d]; });
+  const g = ENG.assignGrade(scores, Object.keys(adv).length ? adv : null, flags, scale);
+  window.__lastGrade = g;
+  window.__lastScores = scores;
+  window.__lastFlags = flags;
+  window.__lastScale = scale;
+  window.__lastMeta = meta || {};
+  const veto = [];
+  if (g.veto.c_severe) veto.push("C 结构严重畸形 → 上限 A2");
+  if (g.veto.b_severe) veto.push("B 持续闪烁/身份漂移 → 上限 A3");
+  let html = '<div class="grade-hero">'
+    + '<div class="grade-badge"><small>A-LEVEL</small>' + g.level.replace("A", "") + '</div>'
+    + '<div class="grade-info"><h2>' + g.level + ' · ' + g.public + '</h2>'
+    + '<div class="meta">等效技术画质：' + g.equiv + (g.capped ? ' ｜ ⚠️ 因否决项从 ' + g.capped_from + ' 下调' : '') + '</div>'
+    + '<div class="score">综合得分 <b>' + g.composite.toFixed(2) + '</b> / 10（' + g.scale + ' 分制）</div></div></div>';
+  if (veto.length) html += '<div class="veto">🚫 一票否决：' + veto.join("；") + '</div>';
+  html += '<div class="card req"><h3>等级判定过程</h3><table><tr><th>等级</th><th>综合分要求</th><th>满足</th><th>缺失项</th></tr>';
+  g.requirements.forEach(r => {
+    html += '<tr><td>' + r.level + '</td><td>≥' + r.min_req + '</td>'
+      + '<td class="' + (r.met ? "ok" : "no") + '">' + (r.met ? "✅" : "❌") + '</td>'
+      + '<td>' + (r.missing.length ? r.missing.join("、") : "—") + '</td></tr>';
+  });
+  html += '</table></div>';
+  html += '<div class="card report"><h3>报告</h3><div class="bar">'
+    + '<button class="btn ghost sm" onclick="copyReport(0)">复制 JSON</button>'
+    + '<button class="btn ghost sm" onclick="copyReport(1)">复制 Markdown</button>'
+    + '<button class="btn ghost sm" onclick="downloadReport(0)">下载 JSON</button>'
+    + '<button class="btn ghost sm" onclick="downloadReport(1)">下载 MD</button></div>'
+    + '<textarea id="report-txt" readonly></textarea></div>';
+  container.innerHTML = html;
+  document.getElementById("report-txt").value = mdReport(buildReport());
+}
+function buildReport() {
+  const rep = {
+    schema_version: "1.0",
+    source: window.__lastMeta.auto ? "web-auto" : "web-manual",
+    scores: {},
+    grade: window.__lastGrade,
+  };
+  ENG.CORE_DIMS.concat(ENG.ADV_DIMS).forEach(d => {
+    const v = window.__lastScores[d];
+    if (v != null) rep.scores[d] = { value: v, source: (window.__lastMeta.auto && ["A", "B", "E"].includes(d)) ? "auto" : "manual" };
+  });
+  return rep;
+}
+function mdReport(rep) {
+  const g = rep.grade;
+  const NL = String.fromCharCode(10);
+  const L = [];
+  L.push("# A-Level 画质评估报告");
+  L.push("");
+  L.push("- **等级**: **" + g.level + "** " + g.public + " (等效 " + g.equiv + ")");
+  L.push("- **综合得分**: " + g.composite.toFixed(2) + " / 10 (分制 " + g.scale + ")");
+  if (g.cap_reason) L.push("- ⚠️ **一票否决**: " + g.cap_reason + " → 最高等级 " + g.level);
+  L.push("");
+  L.push("## 维度得分 (1-5)");
+  L.push("");
+  L.push("| 维度 | 名称 | 得分 | 来源 |");
+  L.push("|------|------|------|------|");
+  ENG.CORE_DIMS.concat(ENG.ADV_DIMS).forEach(d => {
+    if (rep.scores[d]) L.push("| " + d + " | " + ENG.DIM_INFO[d].name + " | " + rep.scores[d].value + " | " + rep.scores[d].source + " |");
+  });
+  L.push("");
+  L.push("## 等级判定过程");
+  L.push("");
+  L.push("| 等级 | 综合分要求 | 满足? | 缺失项 |");
+  L.push("|------|-----------|-------|--------|");
+  g.requirements.forEach(r => L.push("| " + r.level + " | ≥" + r.min_req + " | " + (r.met ? "✅" : "❌") + " | " + (r.missing.length ? r.missing.join("、") : "—") + " |"));
+  L.push("");
+  L.push("> 自动指标为初筛代理, 阈值需在真实语料上标定; 高等级 (A7+) 建议人工复核。");
+  return L.join(NL);
+}
+function copyReport(which) {
+  const rep = buildReport();
+  navigator.clipboard.writeText(which ? mdReport(rep) : JSON.stringify(rep, null, 2)).then(() => alert("已复制到剪贴板"));
+}
+function downloadReport(which) {
+  const rep = buildReport();
+  const blob = new Blob([which ? mdReport(rep) : JSON.stringify(rep, null, 2)], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "alevel-report." + (which ? "md" : "json");
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------------- Tab 切换 ---------------- */
+document.getElementById("tab-btn-manual").addEventListener("click", () => switchTab("manual"));
+document.getElementById("tab-btn-auto").addEventListener("click", () => switchTab("auto"));
+function switchTab(name) {
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("active", b.id === "tab-btn-" + name));
+  document.getElementById("tab-manual").classList.toggle("active", name === "manual");
+  document.getElementById("tab-auto").classList.toggle("active", name === "auto");
+  if (name === "auto") initPyodide();
+}
+
+/* ---------------- 人工评分初始化 ---------------- */
+(function initManual() {
+  ENG.CORE_DIMS.forEach(d => dimSlider(document.getElementById("core-dims"), d, { value: 4, onChange: refreshManual }));
+  ENG.ADV_DIMS.forEach(d => {
+    const input = dimSlider(document.getElementById("adv-dims"), d, { value: 4, onChange: refreshManual });
+    input.disabled = true;
+    const wrap = input.closest(".dim");
+    const lab = document.createElement("label");
+    lab.style.cssText = "font-size:12px;color:var(--dim);display:flex;gap:6px;align-items:center";
+    lab.innerHTML = '<input type="checkbox" data-adv="' + d + '"> 启用评分';
+    wrap.appendChild(lab);
+    lab.querySelector("input").addEventListener("change", e => {
+      input.disabled = !e.target.checked;
+      input.style.opacity = e.target.checked ? 1 : 0.35;
+      refreshManual();
+    });
+    input.style.opacity = 0.35;
+  });
+  ["fl-c", "fl-b"].forEach(id => document.getElementById(id).addEventListener("change", refreshManual));
+  document.getElementById("scale").addEventListener("change", refreshManual);
+  refreshManual();
+})();
+function refreshManual() {
+  const scores = currentManualScores();
+  const flags = currentFlags();
+  const scale = document.getElementById("scale").value;
+  const adv = {};
+  ENG.ADV_DIMS.forEach(d => { if (scores[d] != null) adv[d] = scores[d]; });
+  renderGradeInto(document.getElementById("manual-result"), scores, flags, scale, {});
+}
+
+/* ---------------- 自动评估: 视频帧提取 ---------------- */
+const extract = { frames: null, n: 0, w: 0, h: 0 };
+const fileInput = document.getElementById("file");
+const filebox = document.getElementById("filebox");
+filebox.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+["dragover", "dragleave", "drop"].forEach(ev => filebox.addEventListener(ev, e => {
+  e.preventDefault();
+  filebox.classList.toggle("drag", ev === "dragover" || ev === "drop");
+  if (ev === "drop" && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+}));
+
+async function handleFile(file) {
+  const url = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.src = url;
+  video.preload = "auto";
+  video.muted = true;
+  await new Promise((res, rej) => { video.onloadedmetadata = res; video.onerror = () => rej(new Error("视频解码失败")); });
+  document.getElementById("video-box").innerHTML = "";
+  const vv = video.cloneNode();
+  vv.controls = true;
+  document.getElementById("video-box").appendChild(vv);
+  const fps = 10, maxFrames = 60, scale = 128;
+  const dur = video.duration || 0;
+  if (!(dur > 0)) { document.getElementById("extract-info").textContent = "⚠️ 无法读取视频时长"; return; }
+  const nFrames = Math.max(2, Math.min(maxFrames, Math.floor(dur * fps)));
+  const w = scale, h = Math.max(2, Math.round(scale * video.videoHeight / Math.max(1, video.videoWidth)) & ~1);
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  const frames = new Float32Array(nFrames * w * h);
+  document.getElementById("extract-info").textContent = "抽取帧… 0/" + nFrames;
+  for (let i = 0; i < nFrames; i++) {
+    video.currentTime = Math.min(i / fps, Math.max(0, dur - 0.05));
+    await new Promise(res => { const t = setTimeout(res, 4000); video.onseeked = () => { clearTimeout(t); res(); }; });
+    ctx.drawImage(video, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h).data;
+    for (let p = 0; p < w * h; p++) frames[i * w * h + p] = img[p * 4] / 255;
+    document.getElementById("extract-info").textContent = "抽取帧… " + (i + 1) + "/" + nFrames;
+  }
+  URL.revokeObjectURL(url);
+  extract.frames = frames; extract.n = nFrames; extract.w = w; extract.h = h;
+  document.getElementById("extract-info").textContent = "✅ 已提取 " + nFrames + " 帧（" + w + "×" + h + "，本地处理，未上传）";
+  document.getElementById("btn-run").disabled = !(window.__pyReady && nFrames);
+}
+
+/* ---------------- Pyodide 初始化 ---------------- */
+let pyInitPromise = null;
+function initPyodide() {
+  if (pyInitPromise) return pyInitPromise;
+  const dot = document.getElementById("py-dot"), st = document.getElementById("py-status");
+  pyInitPromise = (async () => {
+    try {
+      st.textContent = "加载 Pyodide 运行时…";
+      const pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/" });
+      window.__pyodide = pyodide;
+      st.textContent = "加载 NumPy 与指标模块…";
+      await pyodide.loadPackage("numpy");
+      installPyModules(pyodide);
+      window.__pyReady = true;
+      dot.className = "dot ready";
+      st.textContent = "✅ 引擎就绪（Pyodide + NumPy + A/B/E 自动指标）";
+      if (extract.frames) document.getElementById("btn-run").disabled = false;
+      window.__pyReady = true;
+      return pyodide;
+    } catch (e) {
+      dot.className = "dot fail";
+      st.textContent = "❌ 引擎加载失败：" + e.message + "（请检查网络后刷新页面重试）";
+      throw e;
+    }
+  })();
+  return pyInitPromise;
+}
+function installPyModules(pyodide) {
+  pyodide.runPython(
+    "import sys, types\n" +
+    "def _install(srcs):\n" +
+    "    def mk(name, src):\n" +
+    "        m = types.ModuleType(name)\n" +
+    "        m.__dict__['__name__'] = name\n" +
+    "        s = src.replace('from .. import spec', 'import spec')\n" +
+    "        s = s.replace('from . import spec', 'import spec')\n" +
+    "        s = s.replace('from . import util', 'import util')\n" +
+    "        exec(compile(s, name, 'exec'), m.__dict__)\n" +
+    "        sys.modules[name] = m\n" +
+    "        return m\n" +
+    "    mk('spec', srcs['spec.py'])\n" +
+    "    mk('util', srcs['util.py'])\n" +
+    "    mk('engine', srcs['engine.py'])\n" +
+    "    mk('spatial', srcs['spatial.py'])\n" +
+    "    mk('temporal', srcs['temporal.py'])\n" +
+    "    mk('texture', srcs['texture.py'])\n" +
+    "    return True\n" +
+    "_install(" + JSON.stringify(PY_MODULES) + ")\n"
+  );
+  pyodide.runPython(
+    "import json, numpy as np\n" +
+    "def _buf(obj):\n" +
+    "    if hasattr(obj, 'to_py'): obj = obj.to_py()\n" +
+    "    if isinstance(obj, (bytes, bytearray)): return bytes(obj)\n" +
+    "    if isinstance(obj, memoryview): return obj.tobytes()\n" +
+    "    return bytes(obj)\n" +
+    "def run_metrics(frames, n, h, w, lite=True):\n" +
+    "    arr = np.frombuffer(_buf(frames), dtype=np.float32).reshape(n, h, w)\n" +
+    "    from spatial import evaluate as se\n" +
+    "    from temporal import evaluate as te\n" +
+    "    from texture import evaluate as xe\n" +
+    "    out = {'A': se(arr), 'B': te(arr, lite=lite), 'E': xe(arr)}\n" +
+    "    return json.dumps(out, ensure_ascii=False)\n"
+  );
+}
+document.getElementById("btn-run").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-run");
+  const st = document.getElementById("run-status");
+  btn.disabled = true;
+  st.innerHTML = '<span class="spinner"></span> 运行自动指标（FFT / 闪烁 / 光流 / 块效应）…';
+  try {
+    const py = window.__pyodide;
+    const res = await py.globals.get("run_metrics")(extract.frames, extract.n, extract.w, extract.h, true);
+    const metrics = JSON.parse(res);
+    window.__autoMetrics = metrics;
+    const box = document.getElementById("metric-results");
+    box.innerHTML = "";
+    ["A", "B", "E"].forEach(d => {
+      const m = metrics[d];
+      const row = document.createElement("div");
+      row.className = "metric-row";
+      row.innerHTML = '<span><b>' + d + '</b> ' + ENG.DIM_INFO[d].name + '：<b style="color:var(--accent2)">' + m.score.toFixed(2) + '</b> 分</span>'
+        + '<span class="m">' + JSON.stringify(m.metrics) + '</span>';
+      box.appendChild(row);
+    });
+    box.appendChild(Object.assign(document.createElement("div"), { className: "hint", textContent: "自动分仅供参考，C/D 由人工补充后进入评级。" }));
+    refreshAutoGrade();
+    st.textContent = "✅ 完成";
+  } catch (e) {
+    st.textContent = "❌ " + e.message;
+  } finally {
+    btn.disabled = !(window.__pyReady && extract.frames);
+  }
+});
+
+/* ---------------- 自动评估: 人工补充 + 评级 ---------------- */
+(function initAutoManual() {
+  ["C", "D"].forEach(d => dimSlider(document.getElementById("auto-manual-dims"), d, { value: 3, onChange: refreshAutoGrade }));
+  ENG.ADV_DIMS.forEach(d => {
+    const input = dimSlider(document.getElementById("auto-manual-dims"), d, { value: 4, onChange: refreshAutoGrade });
+    input.disabled = true;
+    const wrap = input.closest(".dim");
+    const lab = document.createElement("label");
+    lab.style.cssText = "font-size:12px;color:var(--dim);display:flex;gap:6px;align-items:center";
+    lab.innerHTML = '<input type="checkbox" data-adv2="' + d + '"> 启用评分';
+    wrap.appendChild(lab);
+    lab.querySelector("input").addEventListener("change", e => {
+      input.disabled = !e.target.checked;
+      input.style.opacity = e.target.checked ? 1 : 0.35;
+      refreshAutoGrade();
+    });
+    input.style.opacity = 0.35;
+  });
+})();
+function refreshAutoGrade() {
+  if (!window.__autoMetrics) return;
+  const scores = {};
+  ["A", "B", "E"].forEach(d => scores[d] = window.__autoMetrics[d].score);
+  ["C", "D"].forEach(d => scores[d] = parseFloat(document.querySelector('#auto-manual-dims input[data-dim="' + d + '"]').value));
+  const adv = {};
+  ENG.ADV_DIMS.forEach(d => {
+    const el = document.querySelector('#auto-manual-dims input[data-dim="' + d + '"]');
+    if (!el.disabled) adv[d] = parseFloat(el.value);
+  });
+  const flags = currentFlags();
+  renderGradeInto(document.getElementById("auto-result"), scores, flags, "2-10", { auto: true });
+}
+</script>
+</body>
+</html>
