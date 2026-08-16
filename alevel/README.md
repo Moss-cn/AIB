@@ -6,33 +6,36 @@
 ## 特性
 
 - **纯规则引擎** (`alevel/engine.py` + `alevel/spec.py`)：全部阈值/权重/否决规则集中配置，忠实实现方案 3.2 / 3.3 / 3.4；支持 2–10 与 1–5 两种分制。
-- **自动指标**（纯 numpy + ffmpeg，无重型依赖）：
+- **全自动评估（A–E 五项，无需人工评分）**：
   - A 有效空间分辨率：FFT 高频能量占比 + 降采样恢复保真度
   - B 时间稳定性：时间域高频能量（闪烁）+ 块匹配光流光滑度
-  - E 纹理自然度：块效应强度（弱代理，标注低置信度）
+  - C 结构完整性：运动补偿结构残余（morphing）+ cv2 可用时 Haar 人脸检出/抖动增强
+  - D 物理一致性：主光照方向一致性 + 亮度时间稳定性（弱代理，置信度 low）
+  - E 纹理自然度：块效应强度（弱代理，置信度 low）
 - **重型探针接口** (`alevel/metrics/adapters.py`)：MediaPipe Hands / PaddleOCR / RAFT / Depth Anything / ArcFace 等方案 4.1 清单工具的插拔式骨架，装好依赖即可接入。
-- **混合评估**：自动分 + 人工分（JSON）合并，人工分优先。
+- **混合评估**：自动分 + 可选人工修正（JSON），人工修正优先。
 - **报告**：JSON（机器可读）+ Markdown（中文人读）。
 - **演示模式**：ffmpeg 生成 6 类已知性质的合成视频，端到端验证指标敏感性。
+- **Web 版**：单文件 `index.html`（Pyodide 驱动自动指标，浏览器本地处理视频）。
 
 ## 安装
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt   # 仅 numpy
+pip install -r requirements.txt   # 仅 numpy；可选 opencv-python-headless 启用人脸增强
 # 系统需有 ffmpeg (macOS: brew install ffmpeg)
 ```
 
 ## 快速开始
 
 ```bash
-# 1) 演示: 生成合成视频并跑通全流程
+# 1) 演示: 生成合成视频并跑通全流程 (A–E 全自动)
 python -m alevel.cli demo --outdir demo
 
-# 2) 评估真实视频 (自动指标 + 人工补充 C/D)
-python -m alevel.cli evaluate path/to/video.mp4 --manual '{"C":4,"D":4}' --out report.json
+# 2) 全自动评测真实视频 (无需人工评分)
+python -m alevel.cli evaluate path/to/video.mp4 --out report.json
 
-# 3) 纯人工评分 (附录 A 流程)
+# 3) 纯人工评分 (标注/标定流程, 附录 A)
 python -m alevel.cli grade --scores '{"A":4,"B":4,"C":5,"D":4,"E":4}'
 
 # 4) 查看重型探针可用性
@@ -58,5 +61,5 @@ python -m alevel.cli probes
 ## 测试
 
 ```bash
-python tests/run_all.py    # 14 项单元测试 (引擎 + 指标 + 端到端)
+python tests/run_all.py    # 17 项单元测试 (引擎 + 指标 + 端到端)
 ```

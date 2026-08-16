@@ -87,12 +87,12 @@
   </header>
 
   <div class="tabs">
-    <button id="tab-btn-manual" class="active">✍️ 人工评分</button>
-    <button id="tab-btn-auto">🎬 自动评估</button>
+    <button id="tab-btn-auto" class="active">🎬 自动评测</button>
+    <button id="tab-btn-manual">✍️ 人工评分（标定/复核用）</button>
   </div>
 
-  <!-- ============ 人工评分 ============ -->
-  <section id="tab-manual" class="tab active">
+  <!-- ============ 人工评分 (标定/复核用) ============ -->
+  <section id="tab-manual" class="tab">
     <div class="grid2">
       <div class="card">
         <h3>核心维度评分 <span class="tag">必测 · 决定 A1–A7</span></h3>
@@ -116,8 +116,8 @@
     </div>
   </section>
 
-  <!-- ============ 自动评估 ============ -->
-  <section id="tab-auto" class="tab">
+  <!-- ============ 自动评测 (默认) ============ -->
+  <section id="tab-auto" class="tab active">
     <div class="grid2">
       <div class="card">
         <h3>1 · 引擎就绪状态</h3>
@@ -138,11 +138,12 @@
       </div>
       <div>
         <div class="card">
-          <h3>3 · 自动指标结果 <span class="tag">A / B / E</span></h3>
-          <div id="metric-results"><div class="hint">选择视频并运行后显示 FFT 高频能量、时间闪烁、光流光滑度、块效应等指标。</div></div>
+          <h3>3 · 自动指标结果 <span class="tag">A–E 全自动</span></h3>
+          <div id="metric-results"><div class="hint">选择视频并运行后显示 FFT 高频能量、时间闪烁、结构残余、光照一致性、块效应等指标（全部自动计算，无需人工评分）。</div></div>
         </div>
         <div class="card">
-          <h3>4 · 人工补充评分 <span class="tag">C / D 必评</span></h3>
+          <h3>4 · 人工修正 <span class="tag">可选</span></h3>
+          <div class="hint" style="margin-bottom:10px">默认使用自动分；如需覆盖 C/D 或补充进阶维度 F–H，可在此调整。</div>
           <div id="auto-manual-dims"></div>
         </div>
         <div class="card result" id="auto-result"></div>
@@ -170,12 +171,13 @@ const ENG = (typeof ALEVEL_ENGINE !== "undefined") ? ALEVEL_ENGINE : null;
 /* ---------------- 通用: 维度滑块 ---------------- */
 function dimSlider(container, dim, opts) {
   const info = ENG.DIM_INFO[dim];
+  const step = opts.step || 0.5;
   const box = document.createElement("div");
   box.className = "dim";
   box.innerHTML = '<div class="head"><span><span class="code">' + dim + '</span> <span class="name">' + info.name + '</span></span>'
     + '<span class="val" id="val-' + dim + '">' + (opts.value || 3) + '</span></div>'
     + '<div class="desc">' + info.desc + '</div>'
-    + '<input type="range" min="1" max="5" step="0.5" value="' + (opts.value || 3) + '" data-dim="' + dim + '">';
+    + '<input type="range" min="1" max="5" step="' + step + '" value="' + (opts.value || 3) + '" data-dim="' + dim + '">';
   container.appendChild(box);
   const input = box.querySelector("input");
   input.addEventListener("input", () => {
@@ -242,7 +244,7 @@ function buildReport() {
   };
   ENG.CORE_DIMS.concat(ENG.ADV_DIMS).forEach(d => {
     const v = window.__lastScores[d];
-    if (v != null) rep.scores[d] = { value: v, source: (window.__lastMeta.auto && ["A", "B", "E"].includes(d)) ? "auto" : "manual" };
+    if (v != null) rep.scores[d] = { value: v, source: (window.__lastMeta.auto && ["A", "B", "C", "D", "E"].includes(d)) ? "auto" : "manual" };
   });
   return rep;
 }
@@ -390,7 +392,7 @@ function initPyodide() {
       installPyModules(pyodide);
       window.__pyReady = true;
       dot.className = "dot ready";
-      st.textContent = "✅ 引擎就绪（Pyodide + NumPy + A/B/E 自动指标）";
+      st.textContent = "✅ 引擎就绪（Pyodide + NumPy + A–E 五项自动指标）";
       if (extract.frames) document.getElementById("btn-run").disabled = false;
       window.__pyReady = true;
       return pyodide;
@@ -411,6 +413,7 @@ function installPyModules(pyodide) {
     "        m.__dict__['__name__'] = name\n" +
     "        s = src.replace('from .. import spec', 'import spec')\n" +
     "        s = s.replace('from . import spec', 'import spec')\n" +
+    "        s = s.replace('from . import temporal, util', 'import temporal, util')\n" +
     "        s = s.replace('from . import util', 'import util')\n" +
     "        exec(compile(s, name, 'exec'), m.__dict__)\n" +
     "        sys.modules[name] = m\n" +
@@ -421,6 +424,8 @@ function installPyModules(pyodide) {
     "    mk('spatial', srcs['spatial.py'])\n" +
     "    mk('temporal', srcs['temporal.py'])\n" +
     "    mk('texture', srcs['texture.py'])\n" +
+    "    mk('structure', srcs['structure.py'])\n" +
+    "    mk('physics', srcs['physics.py'])\n" +
     "    return True\n" +
     "_install(" + JSON.stringify(PY_MODULES) + ")\n"
   );
@@ -435,8 +440,10 @@ function installPyModules(pyodide) {
     "    arr = np.frombuffer(_buf(frames), dtype=np.float32).reshape(n, h, w)\n" +
     "    from spatial import evaluate as se\n" +
     "    from temporal import evaluate as te\n" +
+    "    from structure import evaluate as ce\n" +
+    "    from physics import evaluate as de\n" +
     "    from texture import evaluate as xe\n" +
-    "    out = {'A': se(arr), 'B': te(arr, lite=lite), 'E': xe(arr)}\n" +
+    "    out = {'A': se(arr), 'B': te(arr, lite=lite), 'C': ce(arr), 'D': de(arr), 'E': xe(arr)}\n" +
     "    return json.dumps(out, ensure_ascii=False)\n"
   );
 }
@@ -444,7 +451,7 @@ document.getElementById("btn-run").addEventListener("click", async () => {
   const btn = document.getElementById("btn-run");
   const st = document.getElementById("run-status");
   btn.disabled = true;
-  st.innerHTML = '<span class="spinner"></span> 运行自动指标（FFT / 闪烁 / 光流 / 块效应）…';
+  st.innerHTML = '<span class="spinner"></span> 运行自动指标（FFT / 闪烁 / 结构残余 / 光照 / 块效应）…';
   try {
     const py = window.__pyodide;
     const res = await py.globals.get("run_metrics")(extract.frames, extract.n, extract.w, extract.h, true);
@@ -452,15 +459,20 @@ document.getElementById("btn-run").addEventListener("click", async () => {
     window.__autoMetrics = metrics;
     const box = document.getElementById("metric-results");
     box.innerHTML = "";
-    ["A", "B", "E"].forEach(d => {
+    ["A", "B", "C", "D", "E"].forEach(d => {
       const m = metrics[d];
       const row = document.createElement("div");
       row.className = "metric-row";
-      row.innerHTML = '<span><b>' + d + '</b> ' + ENG.DIM_INFO[d].name + '：<b style="color:var(--accent2)">' + m.score.toFixed(2) + '</b> 分</span>'
+      row.innerHTML = '<span><b>' + d + '</b> ' + ENG.DIM_INFO[d].name + '：<b style="color:var(--accent2)">' + m.score.toFixed(2) + '</b> 分 <span class="m">(conf=' + m.confidence + ')</span></span>'
         + '<span class="m">' + JSON.stringify(m.metrics) + '</span>';
       box.appendChild(row);
     });
-    box.appendChild(Object.assign(document.createElement("div"), { className: "hint", textContent: "自动分仅供参考，C/D 由人工补充后进入评级。" }));
+    box.appendChild(Object.assign(document.createElement("div"), { className: "hint", textContent: "A–E 五项全部自动计算；可在下方用人工修正覆盖个别维度（可选）。" }));
+    // C/D 滑块默认对齐自动分 (用户可再调整)
+    ["C", "D"].forEach(d => {
+      const el = document.querySelector('#auto-manual-dims input[data-dim="' + d + '"]');
+      if (el) { el.value = metrics[d].score; document.getElementById("val-" + d).textContent = metrics[d].score.toFixed(1); }
+    });
     refreshAutoGrade();
     st.textContent = "✅ 完成";
   } catch (e) {
@@ -472,7 +484,7 @@ document.getElementById("btn-run").addEventListener("click", async () => {
 
 /* ---------------- 自动评估: 人工补充 + 评级 ---------------- */
 (function initAutoManual() {
-  ["C", "D"].forEach(d => dimSlider(document.getElementById("auto-manual-dims"), d, { value: 3, onChange: refreshAutoGrade }));
+  ["C", "D"].forEach(d => dimSlider(document.getElementById("auto-manual-dims"), d, { value: 3, step: 0.1, onChange: refreshAutoGrade }));
   ENG.ADV_DIMS.forEach(d => {
     const input = dimSlider(document.getElementById("auto-manual-dims"), d, { value: 4, onChange: refreshAutoGrade });
     input.disabled = true;
@@ -493,7 +505,10 @@ function refreshAutoGrade() {
   if (!window.__autoMetrics) return;
   const scores = {};
   ["A", "B", "E"].forEach(d => scores[d] = window.__autoMetrics[d].score);
-  ["C", "D"].forEach(d => scores[d] = parseFloat(document.querySelector('#auto-manual-dims input[data-dim="' + d + '"]').value));
+  ["C", "D"].forEach(d => {
+    const el = document.querySelector('#auto-manual-dims input[data-dim="' + d + '"]');
+    scores[d] = el ? parseFloat(el.value) : window.__autoMetrics[d].score;
+  });
   const adv = {};
   ENG.ADV_DIMS.forEach(d => {
     const el = document.querySelector('#auto-manual-dims input[data-dim="' + d + '"]');

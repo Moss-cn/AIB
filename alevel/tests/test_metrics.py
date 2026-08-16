@@ -3,7 +3,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
-from alevel.metrics import spatial, temporal, texture, frames
+from alevel.metrics import physics, spatial, structure, temporal, texture, frames
 
 
 def make_gradient(n=20, h=128, w=128):
@@ -64,10 +64,31 @@ def test_blocking_artifact():
 
 
 def test_evaluate_pipeline_shapes():
-    for fn in (spatial.evaluate, temporal.evaluate, texture.evaluate):
+    for fn in (spatial.evaluate, temporal.evaluate, structure.evaluate, physics.evaluate, texture.evaluate):
         r = fn(make_gradient())
-        assert r["dim"] in "ABE" and 1.0 <= r["score"] <= 5.0
+        assert r["dim"] in "ABCDE" and 1.0 <= r["score"] <= 5.0
         assert "metrics" in r and "confidence" in r
+
+
+def test_morphing_motion_low_noise_high():
+    # 平滑运动 (光流可解释) → 结构残余低; 噪声 (不可解释) → 高
+    assert structure.morphing_index(make_motion()) < 0.02
+    assert structure.morphing_index(make_noise()) > structure.morphing_index(make_motion())
+    assert structure.morphing_index(make_static()) < 1e-5
+
+
+def test_light_consistency():
+    # 纯色/平坦 → 中性 1.0 (不误判); 恒定方向渐变 → 高; 噪声 → 低
+    assert physics.light_direction_consistency(make_static()) >= 0.99
+    grad = make_gradient()
+    assert physics.light_direction_consistency(grad) > 0.6
+    assert physics.light_direction_consistency(make_noise()) < 0.6
+
+
+def test_luminance_flux():
+    assert physics.luminance_flux(make_static()) < 1e-6
+    assert physics.luminance_flux(make_flicker()) > 0.3
+    assert physics.luminance_flux(make_flicker()) > physics.luminance_flux(make_motion())
 
 
 def test_sample_frames_real_video(tmp="/tmp/alevel_test.mp4"):

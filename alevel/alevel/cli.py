@@ -22,7 +22,7 @@ import sys
 from typing import Dict, List, Optional
 
 from . import engine, report, spec
-from .metrics import adapters, frames, spatial, temporal, texture
+from .metrics import adapters, frames, physics, spatial, structure, temporal, texture
 
 
 def _load_manual(raw: Optional[str]) -> Dict:
@@ -71,11 +71,12 @@ def cmd_evaluate(args) -> None:
                               scale=args.scale_px, gray=True)
     print(f"      实际帧数: {fr.shape[0]} (每帧 {fr.shape[1]}x{fr.shape[2]})")
 
-    # 内置自动指标: A / B / E
-    print("[3/4] 运行自动指标 (A: FFT+分辨率保留, B: 闪烁+光流, E: 块效应)...")
-    results: List[Dict] = [spatial.evaluate(fr), temporal.evaluate(fr), texture.evaluate(fr)]
+    # 内置自动指标: A / B / C / D / E (全自动)
+    print("[3/4] 运行自动指标 (A: FFT+分辨率保留, B: 闪烁+光流, C: 结构残余+人脸, D: 光照+亮度, E: 块效应)...")
+    results: List[Dict] = [spatial.evaluate(fr), temporal.evaluate(fr), structure.evaluate(fr),
+                           physics.evaluate(fr), texture.evaluate(fr)]
     for r in results:
-        print(f"      维度 {r['dim']}: {r['score']:.2f}  {r['metrics']}")
+        print(f"      维度 {r['dim']}: {r['score']:.2f} (conf={r.get('confidence')})  {r['metrics']}")
 
     # 重型探针 (可选)
     probes = [p.strip() for p in (args.probes or "").split(",") if p.strip()]
@@ -149,21 +150,19 @@ def cmd_demo(args) -> None:
         video = frames.probe_video(path)
         fr = frames.sample_frames(path, target_fps=args.fps, max_frames=args.max_frames,
                                   scale=args.scale_px, gray=True)
-        results = [spatial.evaluate(fr), temporal.evaluate(fr), texture.evaluate(fr)]
+        results = [spatial.evaluate(fr), temporal.evaluate(fr), structure.evaluate(fr),
+                   physics.evaluate(fr), texture.evaluate(fr)]
         final = {r["dim"]: r["score"] for r in results}
-        # demo 模式: C/D 无自动探针, 用 3.0 作为"未测中性值"占位 (明确标注)
-        assumed = {d: 3.0 for d in ("C", "D") if d not in final}
-        final.update(assumed)
         g = engine.assign_grade(final, scale=args.scale)
-        rows.append((name, g, final, assumed))
-        print(f"  A={final['A']:.2f} B={final['B']:.2f} E={final['E']:.2f} "
-              f"(C/D 为未测占位 {assumed}) 综合={g['composite']:.2f} → {g['level']} {g['public']}")
+        rows.append((name, g, final, {}))
+        print(f"  A={final['A']:.2f} B={final['B']:.2f} C={final['C']:.2f} D={final['D']:.2f} E={final['E']:.2f} "
+              f"综合={g['composite']:.2f} → {g['level']} {g['public']}")
         print()
-    print("对比总结 (C/D 为未测占位 3.0):")
-    print(f"  {'视频':<28}{'A':>6}{'B':>6}{'E':>6}{'综合':>8}  等级")
+    print("对比总结 (全自动 5 维度):")
+    print(f"  {'视频':<28}{'A':>6}{'B':>6}{'C':>6}{'D':>6}{'E':>6}{'综合':>8}  等级")
     for name, g, final, _assumed in rows:
-        print(f"  {name:<28}{final['A']:>6.2f}{final['B']:>6.2f}{final['E']:>6.2f}"
-              f"{g['composite']:>8.2f}  {g['level']}")
+        print(f"  {name:<28}{final['A']:>6.2f}{final['B']:>6.2f}{final['C']:>6.2f}"
+              f"{final['D']:>6.2f}{final['E']:>6.2f}{g['composite']:>8.2f}  {g['level']}")
 
 
 def main(argv: Optional[List[str]] = None) -> int:

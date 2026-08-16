@@ -23,6 +23,8 @@ PY_SOURCES = {
     "spatial.py": ROOT / "alevel" / "metrics" / "spatial.py",
     "temporal.py": ROOT / "alevel" / "metrics" / "temporal.py",
     "texture.py": ROOT / "alevel" / "metrics" / "texture.py",
+    "structure.py": ROOT / "alevel" / "metrics" / "structure.py",
+    "physics.py": ROOT / "alevel" / "metrics" / "physics.py",
 }
 
 
